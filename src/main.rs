@@ -1,7 +1,25 @@
 use bevy::prelude::*;
+use bevy::window::*;
 
 fn main() {
     App::new()
+        .insert_resource(WindowDescriptor {
+            title: "scratch-bevy".to_string(),
+            width: 960.,
+            height: 720.,
+            position: WindowPosition::Automatic,
+            resize_constraints: default(),
+            scale_factor_override: None,
+            present_mode: PresentMode::AutoVsync,
+            resizable: false,
+            decorations: true,
+            cursor_visible: true,
+            cursor_locked: false,
+            mode: WindowMode::Windowed,
+            transparent: false,
+            canvas: None,
+            fit_canvas_to_parent: false,
+        })
         .add_plugins(DefaultPlugins)
         .add_plugin(ScratchStagePlugin)
         .add_plugin(ScratchDemoProjectPlugin)
@@ -21,11 +39,17 @@ struct Name(String);
 #[derive(Component)]
 struct Costume(String);
 
-fn add_spawn_sprite_command(commands: &mut Commands, name: String, costume: String) {
+fn add_spawn_sprite_command<'a, P>(commands: &mut Commands, asset_server: &AssetServer, name: String, costume: P)
+where P: Into<bevy::asset::AssetPath<'a>>
+{
     let mut entity = commands.spawn();
     let sprite = entity.insert(ScratchSprite);
     sprite.insert(Name(name));
-    sprite.insert(Costume(costume));
+    sprite.insert_bundle(SpriteBundle {
+        texture: asset_server.load(costume),
+        transform: Transform::from_xyz(0., 0., 0.),
+        ..default()
+    });
 }
 
 //
@@ -70,7 +94,7 @@ impl Plugin for ScratchDemoProjectPlugin {
     }
 }
 
-fn add_demo_project_sprites(mut commands: Commands) {
-    add_spawn_sprite_command(&mut commands, "Sprite 1".to_string(), "Cat".to_string());
-    add_spawn_sprite_command(&mut commands, "Sprite 2".to_string(), "Ball".to_string());
+fn add_demo_project_sprites(mut commands: Commands, asset_server: Res<AssetServer>) {
+    add_spawn_sprite_command(&mut commands, &asset_server, "Sprite 1".to_string(), "scratch-cat.svg");
+    add_spawn_sprite_command(&mut commands, &asset_server, "Sprite 2".to_string(), "squirrel.png");
 }
