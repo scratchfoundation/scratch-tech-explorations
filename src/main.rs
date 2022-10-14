@@ -1,5 +1,8 @@
 use bevy::prelude::*;
+use bevy::time::FixedTimestep;
 use bevy::window::*;
+
+const TIME_STEP: f64 = 1. / 30.;
 
 fn main() {
     App::new()
@@ -23,6 +26,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(ScratchStagePlugin)
         .add_plugin(ScratchDemoProjectPlugin)
+        .add_system(close_on_esc)
         .run();
 }
 
@@ -31,26 +35,21 @@ fn main() {
 //
 
 #[derive(Component)]
-struct ScratchSprite;
-
-#[derive(Component)]
 struct Name(String);
 
 #[derive(Component)]
 struct Costume(String);
 
-fn add_spawn_sprite_command<'a, P>(commands: &mut Commands, asset_server: &AssetServer, name: String, costume: P)
-where P: Into<bevy::asset::AssetPath<'a>>
-{
-    let mut entity = commands.spawn();
-    let sprite = entity.insert(ScratchSprite);
-    sprite.insert(Name(name));
-    sprite.insert_bundle(SpriteBundle {
-        texture: asset_server.load(costume),
-        transform: Transform::from_xyz(0., 0., 0.),
-        ..default()
-    });
+#[derive(Debug)]
+enum ScratchCode {
+    MoveOneStep,
+    MoveTwoSteps,
+    TurnClockwise,
+    TurnCounterClockwise,
 }
+
+#[derive(Component)]
+struct ScratchScripts(Vec<ScratchCode>);
 
 //
 // Stage
@@ -64,8 +63,11 @@ impl Plugin for ScratchStagePlugin {
     fn build(&self, app: &mut App) {
         app
             .insert_resource(SpriteNameTimer(Timer::from_seconds(2.0, true)))
-            .add_startup_system(add_stage_startup)
-            .add_system(step_vm);
+            .add_system_set(SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(TIME_STEP))
+                .with_system(step_thread)
+            )
+            .add_startup_system(add_stage_startup);
     }
 }
 
@@ -73,10 +75,27 @@ fn add_stage_startup(mut commands: Commands) {
     commands.spawn_bundle(Camera2dBundle::default());
 }
 
-fn step_vm(time: Res<Time>, mut timer: ResMut<SpriteNameTimer>, query: Query<&Name, With<ScratchSprite>>) {
-    if timer.0.tick(time.delta()).just_finished() {
-        for name in query.iter() {
-            println!("found a sprite named {}", name.0);
+fn step_thread(mut thread_query: Query<(&mut Transform, &ScratchScripts)>) {
+    let one_degree_in_radians: f32 = (1.0_f32).to_radians();
+
+    for (mut transform, scripts) in &mut thread_query {
+        for script in &scripts.0 {
+            match script {
+                ScratchCode::MoveOneStep => {
+                    let forward = transform.right();
+                    transform.translation += forward;
+                },
+                ScratchCode::MoveTwoSteps => {
+                    let forward = transform.right();
+                    transform.translation += 2. * forward;
+                },
+                ScratchCode::TurnClockwise => {
+                    transform.rotate_z(-one_degree_in_radians);
+                },
+                ScratchCode::TurnCounterClockwise => {
+                    transform.rotate_z(one_degree_in_radians);
+                },
+            }
         }
     }
 }
@@ -95,6 +114,26 @@ impl Plugin for ScratchDemoProjectPlugin {
 }
 
 fn add_demo_project_sprites(mut commands: Commands, asset_server: Res<AssetServer>) {
-    add_spawn_sprite_command(&mut commands, &asset_server, "Sprite 1".to_string(), "scratch-cat.svg");
-    add_spawn_sprite_command(&mut commands, &asset_server, "Sprite 2".to_string(), "squirrel.png");
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            texture: asset_server.load("squirrel.png"),
+            transform: Transform::from_scale(Vec3::new(0.5, 0.5, 1.)),
+            ..default()
+        })
+        .insert(Name("Sprite 1".to_string()))
+        .insert(ScratchScripts(vec![
+            ScratchCode::MoveOneStep,
+            ScratchCode::TurnClockwise,
+        ]));
+    commands.spawn()
+        .insert_bundle(SpriteBundle {
+            texture: asset_server.load("squirrel.png"),
+            transform: Transform::from_scale(Vec3::new(0.5, 0.5, 1.)),
+            ..default()
+        })
+        .insert(Name("Sprite 2".to_string()))
+        .insert(ScratchScripts(vec![
+            ScratchCode::MoveTwoSteps,
+            ScratchCode::TurnCounterClockwise,
+        ]));
 }
