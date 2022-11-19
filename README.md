@@ -3,6 +3,18 @@
 This branch is for exploring the idea of building a Scratch editor using [Tauri](https://tauri.app/) and
 [Bevy](https://bevyengine.org/). The specific proposed architecture:
 
+## Quick start
+
+`cargo tauri dev`
+
+## Recommended IDE Setup
+
+Recommendation from Tauri:
+
+[VS Code](https://code.visualstudio.com/) +
+  [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) +
+  [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
 ## App architecture
 
 * Tauri will display the Scratch UI, analogous to `scratch-gui`, in a web view
