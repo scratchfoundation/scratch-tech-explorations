@@ -5,6 +5,8 @@ This branch is for exploring the idea of building a Scratch editor using [Tauri]
 
 ## Quick start
 
+Install system prerequisites if necessary: <https://tauri.app/v1/guides/getting-started/prerequisites>
+
 `cargo tauri dev`
 
 ## Recommended IDE Setup
