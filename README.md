@@ -3,11 +3,22 @@
 This branch is for exploring the idea of building a Scratch editor using [Tauri](https://tauri.app/) and
 [Bevy](https://bevyengine.org/). The specific proposed architecture:
 
+It was created with this command:
+
+```sh
+pnpm create tauri-app -m pnpm -t react-ts scratch-tauri-bevy
+```
+
 ## Quick start
 
 Install system prerequisites if necessary: <https://tauri.app/v1/guides/getting-started/prerequisites>
 
-`cargo tauri dev`
+Then run:
+
+```sh
+pnpm install
+pnpm tauri dev
+```
 
 ## Recommended IDE Setup
 
