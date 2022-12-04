@@ -1,6 +1,6 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/tauri";
+
 import "./App.css";
 
 function App() {
@@ -13,36 +13,38 @@ function App() {
   }
 
   return (
-    <div className="container">
-      <h1>Welcome to Tauri!</h1>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div id="gui" style={{position: "absolute", top: 0, right: 0, bottom: 0, left: 0}}>
+      <div id="menu-bar" style={{display: "flex", flexDirection:"row"}}>
+        <button>File</button>
+        <button>Edit</button>
+        <button>Things</button>
+        <button>Stuff</button>
       </div>
-
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <div className="row">
-        <div>
-          <input
-            id="greet-input"
-            onChange={(e) => setName(e.currentTarget.value)}
-            placeholder="Enter a name..."
-          />
-          <button type="button" onClick={() => greet()}>
-            Greet
-          </button>
+      <div id="body" style={{display: "flex", flexDirection: "row", height: "100%"}}>
+        <div id="editor-wrapper" style={{flexGrow: "1"}}>
+          <div id="tabs" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <ul id="tablist" style={{ display: "flex", flexDirection: "row" }}>
+              <button>Code</button>
+              <button>Costumes</button>
+              <button>Sounds</button>
+            </ul>
+            <div id="code-tab" style={{ height: "100%", border: "1px solid black" }}>
+              Blockly goes here
+            </div>
+          </div>
+        </div>
+        <div id="stage-and-targets">
+          <div id="stage-controls" style={{ display: "flex", flexDirection: "row" }}>
+            <button style={{color: "green"}}>⚑</button>
+          </div>
+          <div id="stage-wrapper" style={{border: "1px solid black"}}>
+            <canvas width={480} height={360}></canvas>
+          </div>
+          <div id="targets-wrapper" style={{ height: "100%", border: "1px solid black" }}>
+            Sprites and the Stage
+          </div>
         </div>
       </div>
-      <p>{greetMsg}</p>
     </div>
   );
 }
