@@ -8,6 +8,8 @@ rust-version = "1.65"
 
 [dependencies]
 bevy = "0.9.1"
+futures-lite = "1.12.0"
+zip = { version = "0.6.3", default-features = false, features = ["deflate"] }
 
 [features]
 # remember to disable bevy's "dynamic" feature for release builds
