@@ -1,29 +1,25 @@
-use bevy::prelude::*;
-use bevy::time::FixedTimestep;
-use bevy::window::*;
+use bevy::{
+    prelude::*,
+    time::FixedTimestep,
+    window::*,
+};
 
 const TIME_STEP: f64 = 1. / 30.;
 
 fn main() {
     App::new()
-        .insert_resource(WindowDescriptor {
-            title: "scratch-bevy".to_string(),
-            width: 960.,
-            height: 720.,
-            position: WindowPosition::Automatic,
-            resize_constraints: default(),
-            scale_factor_override: None,
-            present_mode: PresentMode::AutoVsync,
-            resizable: false,
-            decorations: true,
-            cursor_visible: true,
-            cursor_locked: false,
-            mode: WindowMode::Windowed,
-            transparent: false,
-            canvas: None,
-            fit_canvas_to_parent: false,
-        })
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor {
+                title: "scratch-bevy".to_string(),
+                width: 960.,
+                height: 720.,
+                resize_constraints: default(),
+                present_mode: PresentMode::AutoVsync,
+                mode: WindowMode::Windowed,
+                ..default()
+            },
+            ..default()
+        }))
         .add_plugin(ScratchStagePlugin)
         .add_plugin(ScratchDemoProjectPlugin)
         .add_system(close_on_esc)
@@ -57,12 +53,16 @@ struct ScratchScripts(Vec<ScratchCode>);
 
 pub struct ScratchStagePlugin;
 
+#[derive(Resource)]
 struct SpriteNameTimer(Timer);
 
 impl Plugin for ScratchStagePlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(SpriteNameTimer(Timer::from_seconds(2.0, true)))
+            .insert_resource(SpriteNameTimer(Timer::from_seconds(
+                2.0,
+                TimerMode::Repeating,
+            )))
             .add_system_set(SystemSet::new()
                 .with_run_criteria(FixedTimestep::step(TIME_STEP))
                 .with_system(step_thread)
@@ -72,7 +72,7 @@ impl Plugin for ScratchStagePlugin {
 }
 
 fn add_stage_startup(mut commands: Commands) {
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 }
 
 fn step_thread(mut thread_query: Query<(&mut Transform, &ScratchScripts)>) {
@@ -114,8 +114,8 @@ impl Plugin for ScratchDemoProjectPlugin {
 }
 
 fn add_demo_project_sprites(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn()
-        .insert_bundle(SpriteBundle {
+    commands.spawn(
+        SpriteBundle {
             texture: asset_server.load("squirrel.png"),
             transform: Transform::from_scale(Vec3::new(0.5, 0.5, 1.)),
             ..default()
@@ -125,8 +125,8 @@ fn add_demo_project_sprites(mut commands: Commands, asset_server: Res<AssetServe
             ScratchCode::MoveOneStep,
             ScratchCode::TurnClockwise,
         ]));
-    commands.spawn()
-        .insert_bundle(SpriteBundle {
+    commands.spawn(
+        SpriteBundle {
             texture: asset_server.load("squirrel.png"),
             transform: Transform::from_scale(Vec3::new(0.5, 0.5, 1.)),
             ..default()
