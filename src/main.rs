@@ -68,19 +68,23 @@ impl ScratchLoadingScreenPlugin {
 
     fn start_loading_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
         commands.spawn((
-            SpriteBundle {
-                texture: asset_server.load("squirrel.png"),
+            Text2dBundle {
+                text: Text::from_section("Loading...",
+                    TextStyle {
+                        font: asset_server.load("fonts/Scratch.ttf"),
+                        font_size: 60.0,
+                        color: Color::ORANGE,
+                    }
+                ).with_alignment(TextAlignment::CENTER),
                 ..default()
             },
             LoadingScreen
         ));
     }
 
-    fn update_loading_screen(mut loading_screen_query: Query<&mut Transform, With<LoadingScreen>>) {
-        let one_degree_in_radians: f32 = (1.0_f32).to_radians();
-
+    fn update_loading_screen(time: Res<Time>, mut loading_screen_query: Query<&mut Transform, With<LoadingScreen>>) {
         for mut transform in &mut loading_screen_query {
-            transform.rotate_z(-one_degree_in_radians);
+            transform.rotation = Quat::from_rotation_z((5. * time.elapsed_seconds()).cos());
         }
     }
 
