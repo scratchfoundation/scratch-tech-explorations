@@ -1,2 +1,4 @@
 /.vscode
+/assets/fonts
+/node_modules
 /target
