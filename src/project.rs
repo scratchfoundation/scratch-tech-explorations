@@ -3,6 +3,8 @@ use bevy::{
     tasks::*,
 };
 use futures_lite::future;
+use std::{fs, path::Path};
+use zip::ZipArchive;
 
 use crate::AppState;
 
@@ -20,37 +22,38 @@ impl Plugin for ScratchDemoProjectPlugin {
 }
 
 #[derive(Resource)]
-struct ProjectZip(HandleUntyped);
+struct ProjectLoadTask(Task<usize>);
 
-#[derive(Resource)]
-struct ProjectLoadTask(Task<i32>);
-
-fn project_load(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn project_load(mut commands: Commands) {
     info!("Starting project load");
-    let project_handle = asset_server.load_untyped("Infinite Toebeans.sb3");
-    commands.insert_resource(ProjectZip(project_handle))
+    let thread_pool = AsyncComputeTaskPool::get();
+    let load_task = thread_pool.spawn(async move {
+        deserialize_sb3("assets/Infinite ToeBeans.sb3").await
+    });
+    commands.insert_resource(ProjectLoadTask(load_task));
 }
 
-fn project_check_load(mut commands: Commands, mut app_state: ResMut<State<AppState>>, project_zip: Option<Res<ProjectZip>>, mut project_task: Option<ResMut<ProjectLoadTask>>) {
-    if let Some(project_zip) = project_zip {
-        if project_zip.is_added() {
-            info!("Project archive is loaded. Time to unpack...");
-            let thread_pool = AsyncComputeTaskPool::get();
-            let load_task = thread_pool.spawn(async move {
-                let start_time = std::time::Instant::now();
-                while start_time.elapsed() < std::time::Duration::from_secs_f32(4.2)
-                {
-                    // spin
-                }
-                42 // return hydrated project
-            });
-            commands.insert_resource(ProjectLoadTask(load_task));
-        }
-        else if let Some(project_task) = &mut project_task {
-            if let Some(project_data) = future::block_on(future::poll_once(&mut project_task.0)) {
-                info!("Project data is: {}", project_data);
-                app_state.set(AppState::Running).unwrap();
-            }
+fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: Option<ResMut<ProjectLoadTask>>) {
+    if let Some(project_task) = &mut project_task {
+        if let Some(project_data) = future::block_on(future::poll_once(&mut project_task.0)) {
+            info!("Project data is: {}", project_data);
+            app_state.set(AppState::Running).unwrap();
         }
     }
+}
+
+async fn deserialize_sb3(path: impl AsRef<Path>) -> usize {
+
+    // TODO: would it make sense to use async_zip instead? ...but will tokio conflict with bevy?
+
+    let file = fs::File::open(&path).unwrap();
+    let sb3_zip = ZipArchive::new(file).unwrap();
+
+    let start_time = std::time::Instant::now();
+    while start_time.elapsed() < std::time::Duration::from_secs_f32(4.2)
+    {
+        // spin to pretend we're loading lots of stuff
+    }
+
+    sb3_zip.len() // return hydrated project
 }
