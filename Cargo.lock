@@ -2632,6 +2632,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "futures-lite",
+ "serde_json",
  "zip",
 ]
 
