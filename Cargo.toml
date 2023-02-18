@@ -9,6 +9,7 @@ rust-version = "1.65"
 [dependencies]
 bevy = "0.9.1"
 futures-lite = "1.12.0"
+serde = {version = "1.0.152", features = ["std", "derive"]}
 serde_json = {version = "1.0.85", features = ["std", "float_roundtrip"]}
 zip = "0.6.3"
 

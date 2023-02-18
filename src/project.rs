@@ -4,9 +4,11 @@ use bevy::{
 };
 use futures_lite::future;
 use std::{fs, path::Path};
-use zip::{ZipArchive, result::ZipError};
+use zip::result::ZipError;
 
 use crate::AppState;
+use crate::project_bundle::ProjectBundle;
+use crate::sb3::SB3;
 
 pub struct ScratchDemoProjectPlugin;
 
@@ -21,10 +23,10 @@ impl Plugin for ScratchDemoProjectPlugin {
     }
 }
 
-type ProjectLoadResult = Result<serde_json::Value, ProjectLoadError>;
+type ProjectLoadResult = Result<ProjectBundle, ProjectLoadError>;
 
 #[derive(Debug)]
-enum ProjectLoadError {
+pub enum ProjectLoadError {
     IoError(std::io::Error),
     ParseError(serde_json::Error),
     ZipError(ZipError),
@@ -74,7 +76,7 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
     if let Some(project_task) = &mut project_task {
         if let Some(project_load_result) = future::block_on(future::poll_once(&mut project_task.0)) {
             match project_load_result {
-                Ok(project_data) => info!("Project loaded data: {}", project_data),
+                Ok(project_data) => info!("Project loaded data: {:#?}", project_data),
                 Err(project_error) => error!("Project load failure: {}", project_error),
             }
 
@@ -110,12 +112,7 @@ async fn deserialize_sb3(path: impl AsRef<Path>) -> ProjectLoadResult {
 
     let file = fs::File::open(&path)?;
 
-    // this will open the ZIP and read the central directory
-    let mut sb3_zip = ZipArchive::new(file)?;
+    let project_bundle = SB3::from_reader(file)?;
 
-    let project_json_reader = sb3_zip.by_name("project.json")?;
-
-    let project_json: serde_json::Value = serde_json::from_reader(project_json_reader)?;
-
-    Ok(project_json) // return hydrated project
+    Ok(project_bundle) // return hydrated project
 }
