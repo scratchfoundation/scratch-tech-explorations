@@ -2,7 +2,8 @@ pub mod load;
 
 use std::fmt::Debug;
 
-use serde::{Deserialize, Serialize};
+use bevy::prelude::info;
+use serde::{Deserialize, Serialize, de::{Visitor, self}, ser::SerializeSeq};
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 #[derive(Deserialize, Serialize)]
@@ -95,9 +96,6 @@ pub struct Target {
     pub name: String,
 
     #[serde(default)]
-    pub scripts: Vec<serde_json::Value>, // TODO
-
-    #[serde(default)]
     pub variables: Vec<Variable>,
 
     #[serde(default)]
@@ -110,6 +108,9 @@ pub struct Target {
     pub costumes: Vec<Costume>,
 
     pub current_costume_index: i32,
+
+    #[serde(default)]
+    pub scripts: Vec<TopLevelScript>,
 }
 
 #[derive(Debug)]
@@ -206,4 +207,86 @@ pub struct Info {
     // unknown fields will be preserved here
     #[serde(flatten)]
     pub other_info: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug)]
+pub struct TopLevelScript {
+    pub x: f64,
+    pub y: f64,
+    pub script: Script,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+#[serde(transparent)]
+pub struct Script {
+    pub blocks: Vec<Block>,
+}
+
+/*
+#[derive(Debug)]
+pub struct Block {
+    pub opcode: String,
+    pub args: Vec<BlockArgument>,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum BlockArgument {
+    Literal(serde_json::Value),
+}
+*/
+type Block = Vec<serde_json::Value>;
+
+impl<'de> Deserialize<'de> for TopLevelScript {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: serde::Deserializer<'de>,
+    {
+        struct TopLevelScriptVisitor;
+
+        impl<'de> Visitor<'de> for TopLevelScriptVisitor {
+            type Value = TopLevelScript;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("coordinates followed by script blocks")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where A: serde::de::SeqAccess<'de>,
+            {
+                let x = seq.next_element()?.ok_or_else(||
+                    de::Error::custom("could not read X coordinate for script")
+                )?;
+                let y = seq.next_element()?.ok_or_else(||
+                    de::Error::custom("could not read Y coordinate for script")
+                )?;
+
+                let mut blocks = Vec::<Block>::with_capacity(seq.size_hint().unwrap_or(0));
+
+                info!("here");
+                while let Some(block) = seq.next_element::<Block>()? {
+                    blocks.push(block);
+                }
+
+                Ok(TopLevelScript { x, y, script: Script { blocks } })
+            }
+        }
+
+        deserializer.deserialize_seq(TopLevelScriptVisitor)
+    }
+}
+
+impl Serialize for TopLevelScript {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        let mut state = serializer.serialize_seq(Some(2+self.script.blocks.len()))?;
+        state.serialize_element(&self.x)?;
+        state.serialize_element(&self.y)?;
+        for block in &self.script.blocks {
+            state.serialize_element(block)?;
+        }
+        state.end()
+    }
 }
