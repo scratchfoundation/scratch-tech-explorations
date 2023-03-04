@@ -1,6 +1,6 @@
 pub mod load;
 
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ pub struct Project {
 
     pub children: Vec<StageChild>,
 
-    pub info: HashMap<String, serde_json::Value>,
+    pub info: Info,
 }
 
 #[derive(Debug)]
@@ -98,16 +98,16 @@ pub struct Target {
     pub scripts: Vec<serde_json::Value>, // TODO
 
     #[serde(default)]
-    pub variables: Vec<Variable>, // TODO: HashMap
+    pub variables: Vec<Variable>,
 
     #[serde(default)]
-    pub lists: Vec<List>, // TODO: HashMap
+    pub lists: Vec<List>,
 
     #[serde(default)]
-    pub sounds: Vec<serde_json::Value>, // TODO
+    pub sounds: Vec<Sound>,
 
     #[serde(default)]
-    pub costumes: Vec<serde_json::Value>, // TODO
+    pub costumes: Vec<Costume>,
 
     pub current_costume_index: i32,
 }
@@ -157,4 +157,53 @@ pub enum RotationStyle {
     Normal,
     LeftRight,
     None,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Costume {
+    pub costume_name: String,
+
+    #[serde(rename = "baseLayerID")]
+    pub base_layer_id: i32,
+
+    #[serde(rename = "baseLayerMD5")]
+    pub base_layer_md5: String,
+
+    pub bitmap_resolution: i32,
+
+    pub rotation_center_x: f64,
+    pub rotation_center_y: f64,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Sound {
+    pub sound_name: String,
+
+    #[serde(rename = "soundID")]
+    pub sound_id: i32,
+
+    pub md5: String,
+    pub sample_count: i32,
+    pub rate: i32,
+    pub format: String,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Info {
+    pub user_agent: String,
+    pub flash_version: String,
+    pub sprite_count: i32,
+    pub video_on: bool,
+    pub script_count: i32,
+    pub swf_version: String,
+
+    // unknown fields will be preserved here
+    #[serde(flatten)]
+    pub other_info: serde_json::Map<String, serde_json::Value>,
 }
