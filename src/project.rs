@@ -4,11 +4,9 @@ use bevy::{
 };
 use futures_lite::future;
 use std::{fs, path::Path};
-use zip::result::ZipError;
 
 use crate::AppState;
-use crate::project_bundle::ProjectBundle;
-use crate::sb3::SB3;
+use crate::sb2;
 
 pub struct ScratchDemoProjectPlugin;
 
@@ -23,51 +21,14 @@ impl Plugin for ScratchDemoProjectPlugin {
     }
 }
 
-type ProjectLoadResult = Result<ProjectBundle, ProjectLoadError>;
-
-#[derive(Debug)]
-pub enum ProjectLoadError {
-    IoError(std::io::Error),
-    ParseError(serde_json::Error),
-    ZipError(ZipError),
-}
-
-impl From<std::io::Error> for ProjectLoadError {
-    fn from(err: std::io::Error) -> Self {
-        Self::IoError(err)
-    }
-}
-
-impl From<serde_json::Error> for ProjectLoadError {
-    fn from(err: serde_json::Error) -> Self {
-        Self::ParseError(err)
-    }
-}
-
-impl From<ZipError> for ProjectLoadError {
-    fn from(err: ZipError) -> Self {
-        Self::ZipError(err)
-    }
-}
-
-impl std::fmt::Display for ProjectLoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::IoError(err) => write!(f, "{}", err),
-            Self::ParseError(err) => write!(f, "{}", err),
-            Self::ZipError(err) => write!(f, "{}", err),
-        }
-    }
-}
-
 #[derive(Resource)]
-struct ProjectLoadTask(Task<ProjectLoadResult>);
+struct ProjectLoadTask(Task<sb2::load::ProjectLoadResult>);
 
 fn project_load(mut commands: Commands) {
     info!("Starting project load");
     let thread_pool = AsyncComputeTaskPool::get();
     let load_task = thread_pool.spawn(async move {
-        load_sb3("assets/Infinite ToeBeans.sb3").await
+        load_sb2("assets/Infinite ToeBeans.sb2").await
     });
     commands.insert_resource(ProjectLoadTask(load_task));
 }
@@ -85,8 +46,8 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
     }
 }
 
-async fn load_sb3(path: impl AsRef<Path>) -> ProjectLoadResult {
-    let project_content = deserialize_sb3(path).await;
+async fn load_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {
+    let project_content = deserialize_sb2(path).await;
 
     // validate project content
     // stop the VM
@@ -100,19 +61,20 @@ async fn load_sb3(path: impl AsRef<Path>) -> ProjectLoadResult {
         while start_time.elapsed() < std::time::Duration::from_secs_f32(4.2)
         {
             // spin to pretend we're loading lots of stuff
+            break; // or don't
         }
     }
 
     project_content
 }
 
-async fn deserialize_sb3(path: impl AsRef<Path>) -> ProjectLoadResult {
+async fn deserialize_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {
 
     // TODO: would it make sense to use async_zip instead? ...but will tokio conflict with bevy?
 
     let file = fs::File::open(&path)?;
 
-    let project_bundle = SB3::from_reader(file)?;
+    let project_bundle = sb2::Project::from_reader(file)?;
 
     Ok(project_bundle) // return hydrated project
 }

@@ -7,6 +7,7 @@ struct Name(String);
 struct Costume(String);
 
 #[derive(Debug)]
+#[allow(dead_code)] // until the new thread step function
 pub enum ScratchCode {
     MoveOneStep,
     MoveTwoSteps,

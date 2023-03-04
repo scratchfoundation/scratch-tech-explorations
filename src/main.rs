@@ -1,7 +1,6 @@
+mod sb2;
 mod loading_screen;
 mod project;
-mod project_bundle;
-mod sb3;
 mod sprite;
 mod stage;
 
