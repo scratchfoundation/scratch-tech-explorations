@@ -221,9 +221,9 @@ pub struct TopLevelScript {
 #[serde(untagged)]
 pub enum Block {
     DefineProcedure(DefineProcedure),
-    EBlock(EBlock),
-    CBlock(CBlock),
-    BasicBlock(BasicBlock),
+    E(EBlock),
+    C(CBlock),
+    Basic(BasicBlock),
 }
 
 #[derive(Debug)]

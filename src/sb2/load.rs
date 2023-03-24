@@ -8,35 +8,35 @@ pub type ProjectLoadResult = Result<Project, ProjectLoadError>;
 
 #[derive(Debug)]
 pub enum ProjectLoadError {
-    IoError(std::io::Error),
-    ParseError(serde_json::Error),
-    ZipError(ZipError),
+    Io(std::io::Error),
+    Parse(serde_json::Error),
+    Zip(ZipError),
 }
 
 impl From<std::io::Error> for ProjectLoadError {
     fn from(err: std::io::Error) -> Self {
-        Self::IoError(err)
+        Self::Io(err)
     }
 }
 
 impl From<serde_json::Error> for ProjectLoadError {
     fn from(err: serde_json::Error) -> Self {
-        Self::ParseError(err)
+        Self::Parse(err)
     }
 }
 
 impl From<ZipError> for ProjectLoadError {
     fn from(err: ZipError) -> Self {
-        Self::ZipError(err)
+        Self::Zip(err)
     }
 }
 
 impl std::fmt::Display for ProjectLoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::IoError(err) => write!(f, "{}", err),
-            Self::ParseError(err) => write!(f, "{}", err),
-            Self::ZipError(err) => write!(f, "{}", err),
+            Self::Io(err) => write!(f, "{}", err),
+            Self::Parse(err) => write!(f, "{}", err),
+            Self::Zip(err) => write!(f, "{}", err),
         }
     }
 }
