@@ -7,6 +7,7 @@ use std::{fs, path::Path};
 
 use crate::AppState;
 use crate::sb2;
+use crate::virtual_machine::VirtualMachine;
 
 pub struct ScratchDemoProjectPlugin;
 
@@ -22,7 +23,7 @@ impl Plugin for ScratchDemoProjectPlugin {
 }
 
 #[derive(Resource)]
-struct ProjectLoadTask(Task<sb2::load::ProjectLoadResult>);
+struct ProjectLoadTask(Task<ProjectLoadResult>);
 
 fn project_load(mut commands: Commands) {
     info!("Starting project load");
@@ -37,7 +38,7 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
     if let Some(project_task) = &mut project_task {
         if let Some(project_load_result) = future::block_on(future::poll_once(&mut project_task.0)) {
             match project_load_result {
-                Ok(project_data) => info!("Project loaded data: {:#?}", project_data),
+                Ok(vm) => info!("Project loaded data: {:#?}", vm),
                 Err(project_error) => error!("Project load failure: {}", project_error),
             }
 
@@ -46,8 +47,14 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
     }
 }
 
-async fn load_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {
-    let project_content = deserialize_sb2(path).await;
+pub type ProjectLoadResult = Result<VirtualMachine, sb2::load::ProjectLoadError>;
+
+async fn load_sb2(path: impl AsRef<Path>) -> ProjectLoadResult {
+    let project_content = deserialize_sb2(path).await?;
+
+    let vm: VirtualMachine = project_content.into();
+
+    info!("{:#?}", vm);
 
     // validate project content
     // stop the VM
@@ -65,7 +72,7 @@ async fn load_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {
         }
     }
 
-    project_content
+    Ok(vm)
 }
 
 async fn deserialize_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {

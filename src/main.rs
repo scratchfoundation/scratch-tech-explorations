@@ -3,6 +3,7 @@ mod loading_screen;
 mod project;
 mod sprite;
 mod stage;
+mod virtual_machine;
 
 use bevy::{
     prelude::*,

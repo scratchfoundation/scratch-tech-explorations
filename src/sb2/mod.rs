@@ -135,7 +135,7 @@ pub struct Monitor {
 #[serde(rename_all="camelCase")]
 pub struct Variable {
     pub name: String,
-    pub value: serde_json::Value,
+    pub value: LiteralValue,
     pub is_persistent: bool,
 }
 
@@ -145,7 +145,7 @@ pub struct Variable {
 pub struct List {
     #[serde(rename="listName")]
     pub name: String,
-    pub contents: Vec<serde_json::Value>,
+    pub contents: Vec<LiteralValue>,
     pub is_persistent: bool,
 }
 
