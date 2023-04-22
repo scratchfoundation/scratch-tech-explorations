@@ -1,67 +1,93 @@
+use std::io;
+
+use zip::ZipArchive;
+
 use crate::sb2;
 
 use crate::virtual_machine as VM;
 
 use super::TopLevelItem;
+use super::load::{VMLoadError, VMLoadResult};
 
-impl From<sb2::Project> for VM::VirtualMachine {
-    fn from(sb2: sb2::Project) -> Self {
-        // 1 stage + other sprites
-        let mut targets = Vec::with_capacity(1 + sb2.children.len());
-        let mut foo: Vec<i32> = vec![]; // project-level container for something
+impl VM::VirtualMachine {
+    pub fn from_sb2_reader<R>(sb2_reader: R) -> VMLoadResult
+    where
+        R: io::Read + std::io::Seek,
+    {
+        // this will open the ZIP and read the central directory
+        let mut sb2_zip = ZipArchive::new(sb2_reader)?;
 
-        targets.push(target_from_target(sb2.stage, &mut foo));
-        for child in sb2.children {
-            match child {
-                sb2::StageChild::Sprite(sprite) => targets.push(target_from_sprite(sprite, &mut foo)),
-                sb2::StageChild::Monitor(_) => (/* TODO: monitors not currently supported */),
-                sb2::StageChild::List(_) => (/* ignore: lists are sometimes duplicated here due to a Scratch 2 bug */),
-            }
-        }
+        let project_json_reader = sb2_zip.by_name("project.json")?;
+        let project_description: sb2::Project = serde_json::from_reader(project_json_reader)?;
 
-        VM::VirtualMachine { targets }
+        let stage = VM::Target::from_sb2_stage(project_description.stage, &mut sb2_zip)?;
+
+        let sprites_iter = project_description.children.into_iter()
+            .filter_map(|child| match child {
+                sb2::StageChild::Sprite(sprite) => Some(sprite),
+                _ => None
+            })
+            .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut sb2_zip));
+
+        let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
+
+        Ok(VM::VirtualMachine {
+            targets
+        })
     }
 }
 
-fn target_from_sprite(sprite: sb2::Sprite, foo: &mut Vec<i32>) -> VM::Target {
-    VM::Target {
-        name: sprite.target.name,
-
-        x: sprite.x,
-        y: sprite.y,
-        scale: sprite.scale,
-        direction: sprite.direction,
-        rotation_style: sprite.rotation_style.into(),
-        is_draggable: sprite.is_draggable,
-        is_visible: sprite.is_visible,
-
-        scripts: sprite.target.scripts.into_iter().map(|script| script.into()).collect(),
-        variables: sprite.target.variables.into_iter().map(|variable| variable.into()).collect(),
-        lists: sprite.target.lists.into_iter().map(|list| list.into()).collect(),
-        sounds: sprite.target.sounds.into_iter().map(|sound| sound.into()).collect(),
-        costumes: sprite.target.costumes.into_iter().map(|costume| costume.into()).collect(),
-        current_costume: sprite.target.current_costume_index,
-    }
+fn load_costumes<R>(costumes: Vec<sb2::Costume>, sb2_zip: &mut ZipArchive<R>) -> Result<Vec<VM::Costume>, VMLoadError> {
+    Ok(vec![])
 }
 
-fn target_from_target(stage: sb2::Stage, foo: &mut Vec<i32>) -> VM::Target {
-    VM::Target {
-        name: stage.target.name,
+fn load_sounds<R>(sounds: Vec<sb2::Sound>, sb2_zip: &mut ZipArchive<R>) -> Result<Vec<VM::Sound>, VMLoadError> {
+    Ok(vec![])
+}
 
-        x: 0.,
-        y: 0.,
-        scale: 100.,
-        direction: 90.,
-        rotation_style: VM::RotationStyle::Normal,
-        is_draggable: false,
-        is_visible: true,
+impl VM::Target {
+    pub fn from_sb2_stage<R>(stage: sb2::Stage, sb2_zip: &mut ZipArchive<R>) -> Result<VM::Target, VMLoadError> {
+        let costumes = load_costumes(stage.target.costumes, sb2_zip)?;
+        let sounds = load_sounds(stage.target.sounds, sb2_zip)?;
 
-        scripts: stage.target.scripts.into_iter().map(|block| block.into()).collect(),
-        variables: stage.target.variables.into_iter().map(|variable| variable.into()).collect(),
-        lists: stage.target.lists.into_iter().map(|list| list.into()).collect(),
-        sounds: stage.target.sounds.into_iter().map(|sound| sound.into()).collect(),
-        costumes: stage.target.costumes.into_iter().map(|costume| costume.into()).collect(),
-        current_costume: stage.target.current_costume_index,
+        Ok(VM::Target {
+            name: stage.target.name,
+            x: 0.0,
+            y: 0.0,
+            scale: 100.0,
+            direction: 90.0,
+            rotation_style: VM::RotationStyle::None,
+            is_draggable: false,
+            is_visible: true,
+            scripts: stage.target.scripts.into_iter().map(|script| script.into()).collect(),
+            variables: stage.target.variables.into_iter().map(|script| script.into()).collect(),
+            lists: stage.target.lists.into_iter().map(|script| script.into()).collect(),
+            sounds,
+            costumes,
+            current_costume: stage.target.current_costume_index,
+        })
+    }
+
+    pub fn from_sb2_sprite<R>(sprite: sb2::Sprite, sb2_zip: &mut ZipArchive<R>) -> Result<VM::Target, VMLoadError> {
+        let costumes = load_costumes(sprite.target.costumes, sb2_zip)?;
+        let sounds = load_sounds(sprite.target.sounds, sb2_zip)?;
+
+        Ok(VM::Target {
+            name: sprite.target.name,
+            x: sprite.x,
+            y: sprite.y,
+            scale: sprite.scale,
+            direction: sprite.direction,
+            rotation_style: sprite.rotation_style.into(),
+            is_draggable: sprite.is_draggable,
+            is_visible: sprite.is_visible,
+            scripts: sprite.target.scripts.into_iter().map(|script| script.into()).collect(),
+            variables: sprite.target.variables.into_iter().map(|script| script.into()).collect(),
+            lists: sprite.target.lists.into_iter().map(|script| script.into()).collect(),
+            sounds,
+            costumes,
+            current_costume: sprite.target.current_costume_index,
+        })
     }
 }
 

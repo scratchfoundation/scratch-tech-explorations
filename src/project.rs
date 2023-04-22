@@ -6,8 +6,8 @@ use futures_lite::future;
 use std::{fs, path::Path};
 
 use crate::AppState;
-use crate::sb2;
 use crate::virtual_machine::VirtualMachine;
+use crate::virtual_machine::load::VMLoadResult;
 
 pub struct ScratchDemoProjectPlugin;
 
@@ -23,7 +23,7 @@ impl Plugin for ScratchDemoProjectPlugin {
 }
 
 #[derive(Resource)]
-struct ProjectLoadTask(Task<ProjectLoadResult>);
+struct ProjectLoadTask(Task<VMLoadResult>);
 
 fn project_load(mut commands: Commands) {
     info!("Starting project load");
@@ -47,19 +47,12 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
     }
 }
 
-pub type ProjectLoadResult = Result<VirtualMachine, sb2::load::ProjectLoadError>;
+async fn load_sb2(path: impl AsRef<Path>) -> VMLoadResult {
+    let new_vm = deserialize_sb2(path).await?;
 
-async fn load_sb2(path: impl AsRef<Path>) -> ProjectLoadResult {
-    let project_content = deserialize_sb2(path).await?;
-
-    let vm: VirtualMachine = project_content.into();
-
-    info!("{:#?}", vm);
-
-    // validate project content
-    // stop the VM
-    // install project into runtime
-    // start the VM
+    // stop the old VM
+    // replace it with the new VM
+    // start the VM (but not the project)
 
     // artificial delay
     {
@@ -72,16 +65,16 @@ async fn load_sb2(path: impl AsRef<Path>) -> ProjectLoadResult {
         }
     }
 
-    Ok(vm)
+    Ok(new_vm)
 }
 
-async fn deserialize_sb2(path: impl AsRef<Path>) -> sb2::load::ProjectLoadResult {
+async fn deserialize_sb2(path: impl AsRef<Path>) -> VMLoadResult {
 
     // TODO: would it make sense to use async_zip instead? ...but will tokio conflict with bevy?
 
     let file = fs::File::open(&path)?;
 
-    let project_bundle = sb2::Project::from_reader(file)?;
+    let new_vm = VirtualMachine::from_sb2_reader(file)?;
 
-    Ok(project_bundle) // return hydrated project
+    Ok(new_vm) // return hydrated project
 }

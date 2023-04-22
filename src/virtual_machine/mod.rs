@@ -1,6 +1,7 @@
 use bevy::utils::HashMap;
 
 mod from_sb2;
+pub mod load;
 
 // This represents the virtual machine state for a Scratch project.
 // Ideally, loading a new Scratch project should mean throwing this away and replacing it with a new instance.
