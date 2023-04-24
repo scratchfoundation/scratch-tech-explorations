@@ -1,12 +1,8 @@
 use bevy::prelude::*;
 
-use bevy::{
-    time::FixedTimestep,
-};
-
 use crate::sprite::{ScratchCode, ScratchScripts};
 
-const TIME_STEP: f64 = 1. / 30.;
+const TIME_STEP: f32 = 1. / 30.;
 
 
 pub struct ScratchStagePlugin;
@@ -21,10 +17,8 @@ impl Plugin for ScratchStagePlugin {
                 2.0,
                 TimerMode::Repeating,
             )))
-            .add_system_set(SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(TIME_STEP))
-                .with_system(step_thread)
-            )
+            .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+            .add_system(step_thread.in_schedule(CoreSchedule::FixedUpdate))
             .add_startup_system(add_stage_startup);
     }
 }

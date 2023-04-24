@@ -15,10 +15,8 @@ impl Plugin for ScratchDemoProjectPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_startup_system(project_load)
-            .add_system_set(
-                SystemSet::on_update(AppState::Loading)
-                    .with_system(project_check_load)
-            );
+            .add_system(project_check_load
+                .in_set(OnUpdate(AppState::Loading)));
     }
 }
 
@@ -34,7 +32,7 @@ fn project_load(mut commands: Commands) {
     commands.insert_resource(ProjectLoadTask(load_task));
 }
 
-fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: Option<ResMut<ProjectLoadTask>>) {
+fn project_check_load(mut app_state: ResMut<NextState<AppState>>, mut project_task: Option<ResMut<ProjectLoadTask>>) {
     if let Some(project_task) = &mut project_task {
         if let Some(project_load_result) = future::block_on(future::poll_once(&mut project_task.0)) {
             match project_load_result {
@@ -42,7 +40,7 @@ fn project_check_load(mut app_state: ResMut<State<AppState>>, mut project_task: 
                 Err(project_error) => error!("Project load failure: {}", project_error),
             }
 
-            app_state.set(AppState::Running).unwrap();
+            app_state.set(AppState::Running);
         }
     }
 }

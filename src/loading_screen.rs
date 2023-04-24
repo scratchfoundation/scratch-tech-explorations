@@ -10,25 +10,19 @@ struct LoadingScreen;
 impl Plugin for ScratchLoadingScreenPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_state(AppState::Loading)
-            .add_system_set(
-                SystemSet::on_enter(AppState::Loading)
-                    .with_system(ScratchLoadingScreenPlugin::start_loading_screen)
-            )
-            .add_system_set(
-                SystemSet::on_update(AppState::Loading)
-                    .with_system(ScratchLoadingScreenPlugin::update_loading_screen)
-            )
-            .add_system_set(
-                SystemSet::on_exit(AppState::Loading)
-                    .with_system(ScratchLoadingScreenPlugin::stop_loading_screen)
-            );
+            .add_system(ScratchLoadingScreenPlugin::start_loading_screen
+                .in_schedule(OnEnter(AppState::Loading)))
+            .add_system(ScratchLoadingScreenPlugin::update_loading_screen
+                .in_set(OnUpdate(AppState::Loading)))
+            .add_system(ScratchLoadingScreenPlugin::stop_loading_screen
+                .in_schedule(OnExit(AppState::Loading)));
     }
 }
 
 impl ScratchLoadingScreenPlugin {
 
     fn start_loading_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
+        info!("start_loading_screen");
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section("Loading...",
@@ -37,7 +31,7 @@ impl ScratchLoadingScreenPlugin {
                         font_size: 60.0,
                         color: Color::ORANGE,
                     }
-                ).with_alignment(TextAlignment::CENTER),
+                ).with_alignment(TextAlignment::Center),
                 ..default()
             },
             LoadingScreen
@@ -51,6 +45,7 @@ impl ScratchLoadingScreenPlugin {
     }
 
     fn stop_loading_screen(mut commands: Commands, mut loading_screen_query: Query<Entity, With<LoadingScreen>>) {
+        info!("stop_loading_screen");
         for loading_screen in &mut loading_screen_query {
             commands.entity(loading_screen).despawn();
         }
