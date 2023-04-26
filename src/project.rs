@@ -34,9 +34,8 @@ fn project_load(
     asset_server: Res<AssetServer>,
  ) {
     info!("Starting project load");
-    let sb2_handle = asset_server.load("Infinite ToeBeans.sb2");
+    let sb2_handle = asset_server.load("Infinite ToeBeans.sb2#project.json");
     commands.insert_resource(LoadingProjectSB2(sb2_handle));
-
 }
 
 fn project_check_load(
