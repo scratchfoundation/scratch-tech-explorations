@@ -20,7 +20,7 @@ impl VM::VirtualMachine {
         Self::from_sb2_zip(&mut sb2_zip)
     }
 
-    pub fn from_sb2_zip<R>(mut sb2_zip: &mut ZipArchive<R>) -> VMLoadResult
+    pub fn from_sb2_zip<R>(sb2_zip: &mut ZipArchive<R>) -> VMLoadResult
     where
         R: io::Read + std::io::Seek,
     {

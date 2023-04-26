@@ -4,6 +4,7 @@ mod project;
 mod sprite;
 mod stage;
 mod virtual_machine;
+mod zip_asset_plugin;
 
 use bevy::{
     prelude::*,
@@ -13,6 +14,7 @@ use bevy::{
 use loading_screen::ScratchLoadingScreenPlugin;
 use project::ScratchDemoProjectPlugin;
 use stage::ScratchStagePlugin;
+use zip_asset_plugin::ZipAssetPlugin;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, Default)]
 
@@ -35,6 +37,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugin(ZipAssetPlugin)
         .add_state::<AppState>()
         .add_plugin(ScratchLoadingScreenPlugin)
         .add_plugin(ScratchStagePlugin)

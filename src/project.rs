@@ -1,62 +1,23 @@
-use bevy::asset::LoadedAsset;
+use std::io;
+
+use bevy::prelude::*;
+
 use zip::ZipArchive;
-use bevy::asset::{AssetLoader, LoadContext};
-use bevy::reflect::TypeUuid;
-use bevy::{
-    prelude::*,
-};
-use std::io::{Cursor, self};
-use std::{fs, path::Path};
 
 use crate::AppState;
 use crate::virtual_machine::VirtualMachine;
-use crate::virtual_machine::load::{VMLoadResult, VMLoadError};
+use crate::virtual_machine::load::VMLoadError;
+use crate::zip_asset_plugin::ZipAsset;
 
 pub struct ScratchDemoProjectPlugin;
 
 impl Plugin for ScratchDemoProjectPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_asset::<ZipAsset>()
-            .add_asset_loader(ZipAssetLoader)
-            .init_asset_loader::<ZipAssetLoader>()
             .add_startup_system(project_load)
             .add_system(project_check_load
                 .in_set(OnUpdate(AppState::Loading)));
     }
-}
-
-#[derive(TypeUuid)]
-#[uuid = "b27daf98-015c-473e-bba7-631b00d45925"]
-pub struct ZipAsset(ZipArchive<Cursor<Vec<u8>>>);
-
-#[derive(Default)]
-pub struct ZipAssetLoader;
-
-impl AssetLoader for ZipAssetLoader {
-    fn extensions(&self) -> &[&str] {
-        &["sb2", "sb3", "zip"]
-    }
-
-    fn load<'a>(
-        &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
-        Box::pin(async move {
-            load_zip(bytes, load_context).await
-        })
-    }
-}
-
-async fn load_zip<'a, 'b>(
-    bytes: &'a [u8],
-    load_context: &'a mut bevy::asset::LoadContext<'b>,
-) -> Result<(), bevy::asset::Error> {
-    let reader = Cursor::new(bytes.to_vec());
-    let zip = ZipArchive::new(reader)?;
-    load_context.set_default_asset(LoadedAsset::new(ZipAsset(zip)));
-    Ok(())
 }
 
 #[derive(Resource)]
@@ -71,7 +32,6 @@ struct LoadingProjectAssets{
 fn project_load(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut app_state: ResMut<NextState<AppState>>,
  ) {
     info!("Starting project load");
     let sb2_handle = asset_server.load("Infinite ToeBeans.sb2");
@@ -81,7 +41,7 @@ fn project_load(
 
 fn project_check_load(
     mut commands: Commands,
-    mut loading_project: ResMut<LoadingProjectSB2>,
+    loading_project: ResMut<LoadingProjectSB2>,
     asset_server: Res<AssetServer>,
     mut sb2_assets: ResMut<Assets<ZipAsset>>,
 ) {
