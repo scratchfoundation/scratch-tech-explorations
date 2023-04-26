@@ -5,9 +5,9 @@ use bevy::prelude::*;
 use zip::ZipArchive;
 
 use crate::AppState;
+use crate::assets::zip_asset_plugin::ZipAsset;
 use crate::virtual_machine::VirtualMachine;
 use crate::virtual_machine::load::VMLoadError;
-use crate::zip_asset_plugin::ZipAsset;
 
 pub struct ScratchDemoProjectPlugin;
 

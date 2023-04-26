@@ -1,10 +1,12 @@
-mod sb2;
+mod assets;
 mod loading_screen;
 mod project;
+mod sb2;
 mod sprite;
 mod stage;
 mod virtual_machine;
-mod zip_asset_plugin;
+
+use assets::zip_asset_plugin::ZipAssetPlugin;
 
 use bevy::{
     prelude::*,
@@ -14,7 +16,6 @@ use bevy::{
 use loading_screen::ScratchLoadingScreenPlugin;
 use project::ScratchDemoProjectPlugin;
 use stage::ScratchStagePlugin;
-use zip_asset_plugin::ZipAssetPlugin;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, Default)]
 
