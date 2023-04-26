@@ -17,17 +17,24 @@ impl VM::VirtualMachine {
         // this will open the ZIP and read the central directory
         let mut sb2_zip = ZipArchive::new(sb2_reader)?;
 
+        Self::from_sb2_zip(&mut sb2_zip)
+    }
+
+    pub fn from_sb2_zip<R>(mut sb2_zip: &mut ZipArchive<R>) -> VMLoadResult
+    where
+        R: io::Read + std::io::Seek,
+    {
         let project_json_reader = sb2_zip.by_name("project.json")?;
         let project_description: sb2::Project = serde_json::from_reader(project_json_reader)?;
 
-        let stage = VM::Target::from_sb2_stage(project_description.stage, &mut sb2_zip)?;
+        let stage = VM::Target::from_sb2_stage(project_description.stage, sb2_zip)?;
 
         let sprites_iter = project_description.children.into_iter()
             .filter_map(|child| match child {
                 sb2::StageChild::Sprite(sprite) => Some(sprite),
                 _ => None
             })
-            .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut sb2_zip));
+            .map(|sprite| VM::Target::from_sb2_sprite(sprite, sb2_zip));
 
         let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
 
