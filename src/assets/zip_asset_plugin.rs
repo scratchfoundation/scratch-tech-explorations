@@ -9,6 +9,8 @@ use bevy::{
 
 use zip::ZipArchive;
 
+use crate::assets::json_asset_plugin::JSONAsset;
+
 
 #[derive(TypeUuid)]
 #[uuid = "b27daf98-015c-473e-bba7-631b00d45925"]
@@ -49,7 +51,6 @@ async fn load_zip<'a, 'b>(
     load_context: &'a mut bevy::asset::LoadContext<'b>,
 ) -> Result<(), bevy::asset::Error> {
     info!("loading a ZIP ({} bytes)", bytes.len());
-    //std::thread::sleep(std::time::Duration::from_secs(25));
     let reader = Cursor::new(bytes.to_vec());
     let mut zip = ZipArchive::new(reader)?;
     for i in 0..zip.len() {
@@ -67,8 +68,10 @@ async fn load_zip<'a, 'b>(
 }
 
 fn add_labeled_asset(load_context: &mut LoadContext, label: &str, bytes: &[u8]) -> Result<(), bevy::asset::Error> {
-
     let lower_label = label.to_lowercase();
+
+    // pretend that loading takes a long time
+    std::thread::sleep(std::time::Duration::from_millis(250));
 
     if lower_label.ends_with(".png") {
         info!("registering PNG: {}", label);
@@ -89,6 +92,14 @@ fn add_labeled_asset(load_context: &mut LoadContext, label: &str, bytes: &[u8]) 
             bytes: bytes.into()
         };
         load_context.set_labeled_asset(label, LoadedAsset::new(audio));
+
+        return Ok(());
+    }
+
+    if lower_label.ends_with(".json") {
+        info!("registering JSON: {}", label);
+        let asset = JSONAsset(bytes.into());
+        load_context.set_labeled_asset(label, LoadedAsset::new(asset));
 
         return Ok(());
     }

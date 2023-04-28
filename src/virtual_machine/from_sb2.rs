@@ -1,6 +1,6 @@
-use std::io;
-
-use zip::ZipArchive;
+use bevy::asset::Asset;
+use bevy::prelude::*;
+use bevy::utils::HashSet;
 
 use crate::sb2;
 
@@ -10,52 +10,104 @@ use super::TopLevelItem;
 use super::load::{VMLoadError, VMLoadResult};
 
 impl VM::VirtualMachine {
-    pub fn from_sb2_reader<R>(sb2_reader: R) -> VMLoadResult
-    where
-        R: io::Read + std::io::Seek,
-    {
-        // this will open the ZIP and read the central directory
-        let mut sb2_zip = ZipArchive::new(sb2_reader)?;
+    pub fn from_sb2_json(
+        sb2_json: &[u8],
+        sb2_path: &Option<String>,
+        asset_server: Res<AssetServer>,
+    ) -> Result<(Self, HashSet<HandleUntyped>), VMLoadError> {
+        let project_description: sb2::Project = serde_json::from_slice(sb2_json)?;
 
-        Self::from_sb2_zip(&mut sb2_zip)
-    }
+        let mut asset_helper = AssetHelper {
+            asset_server,
+            sb2_path,
+            all_assets: HashSet::new()
+        };
 
-    pub fn from_sb2_zip<R>(sb2_zip: &mut ZipArchive<R>) -> VMLoadResult
-    where
-        R: io::Read + std::io::Seek,
-    {
-        let project_json_reader = sb2_zip.by_name("project.json")?;
-        let project_description: sb2::Project = serde_json::from_reader(project_json_reader)?;
-
-        let stage = VM::Target::from_sb2_stage(project_description.stage, sb2_zip)?;
+        let stage = VM::Target::from_sb2_stage(project_description.stage, &mut asset_helper)?;
 
         let sprites_iter = project_description.children.into_iter()
             .filter_map(|child| match child {
                 sb2::StageChild::Sprite(sprite) => Some(sprite),
                 _ => None
             })
-            .map(|sprite| VM::Target::from_sb2_sprite(sprite, sb2_zip));
+            .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut asset_helper));
 
         let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
 
-        Ok(VM::VirtualMachine {
+        Ok((VM::VirtualMachine {
             targets
-        })
+        }, asset_helper.all_assets))
     }
 }
 
-fn load_costumes<R>(costumes: Vec<sb2::Costume>, sb2_zip: &mut ZipArchive<R>) -> Result<Vec<VM::Costume>, VMLoadError> {
-    Ok(vec![])
+struct AssetHelper<'a> {
+    asset_server: Res<'a, AssetServer>,
+    sb2_path: &'a Option<String>,
+    all_assets: HashSet<HandleUntyped>,
 }
 
-fn load_sounds<R>(sounds: Vec<sb2::Sound>, sb2_zip: &mut ZipArchive<R>) -> Result<Vec<VM::Sound>, VMLoadError> {
-    Ok(vec![])
+impl AssetHelper<'_> {
+    fn get_asset<T>(&mut self, md5: &str, ext: &str, id: i32) -> Handle<T>
+    where
+        T: Asset
+    {
+        let handle = match self.sb2_path {
+            Some(sb2_path) => {
+                self.asset_server.load(sb2_path.to_string() + "#" + &id.to_string() + "." + ext)
+            }
+            None => {
+                todo!("add support for downloading assets")
+            }
+        };
+        self.all_assets.insert(handle.clone_weak_untyped());
+        handle
+    }
+}
+
+fn load_costumes(costumes: Vec<sb2::Costume>, asset_helper: &mut AssetHelper) -> Vec<VM::Costume> {
+    costumes
+        .into_iter()
+        .map(|costume| {
+            let image = match costume.base_layer_md5.split_once(".") {
+                Some((md5, ext)) => asset_helper.get_asset(md5, ext, costume.base_layer_id),
+                None => todo!("couldn't understand costume designation: {}", costume.base_layer_md5),
+            };
+            VM::Costume {
+                name: costume.costume_name,
+                image,
+                bitmap_resolution: costume.bitmap_resolution,
+                rotation_center_x: costume.rotation_center_x,
+                rotation_center_y: costume.rotation_center_y,
+                layer_index: costume.base_layer_id,
+            }
+        })
+        .collect()
+}
+
+fn load_sounds(sounds: Vec<sb2::Sound>, asset_helper: &mut AssetHelper) -> Vec<VM::Sound> {
+    sounds
+        .into_iter()
+        .map(|sound| {
+            let audio_source = match sound.md5.split_once(".") {
+                Some((md5, ext)) => asset_helper.get_asset(md5, ext, sound.sound_id),
+                None => todo!("couldn't understand sound designation: {}", sound.md5),
+            };
+            VM::Sound {
+                name: sound.sound_name,
+                audio_source,
+                format: sound.format,
+                sample_rate: sound.rate,
+                sample_count: sound.sample_count,
+                sound_index: sound.sound_id,
+            }
+        })
+        .collect()
 }
 
 impl VM::Target {
-    pub fn from_sb2_stage<R>(stage: sb2::Stage, sb2_zip: &mut ZipArchive<R>) -> Result<VM::Target, VMLoadError> {
-        let costumes = load_costumes(stage.target.costumes, sb2_zip)?;
-        let sounds = load_sounds(stage.target.sounds, sb2_zip)?;
+    fn from_sb2_stage(stage: sb2::Stage, asset_helper: &mut AssetHelper) -> Result<VM::Target, VMLoadError> {
+        let costumes = load_costumes(stage.target.costumes, asset_helper);
+        let sounds = load_sounds(stage.target.sounds, asset_helper);
 
         Ok(VM::Target {
             name: stage.target.name,
@@ -75,9 +127,9 @@ impl VM::Target {
         })
     }
 
-    pub fn from_sb2_sprite<R>(sprite: sb2::Sprite, sb2_zip: &mut ZipArchive<R>) -> Result<VM::Target, VMLoadError> {
-        let costumes = load_costumes(sprite.target.costumes, sb2_zip)?;
-        let sounds = load_sounds(sprite.target.sounds, sb2_zip)?;
+    fn from_sb2_sprite(sprite: sb2::Sprite, asset_helper: &mut AssetHelper) -> Result<VM::Target, VMLoadError> {
+        let costumes = load_costumes(sprite.target.costumes, asset_helper);
+        let sounds = load_sounds(sprite.target.sounds, asset_helper);
 
         Ok(VM::Target {
             name: sprite.target.name,
@@ -241,31 +293,5 @@ impl From<sb2::List> for (String, VM::List) {
                 is_cloud: value.is_persistent,
             }
         )
-    }
-}
-
-impl From<sb2::Sound> for VM::Sound {
-    fn from(value: sb2::Sound) -> Self {
-        VM::Sound {
-            name: value.sound_name,
-            md5: value.md5,
-            format: value.format,
-            sample_rate: value.rate,
-            sample_count: value.sample_count,
-            sound_index: value.sound_id, // TODO: connect references
-        }
-    }
-}
-
-impl From<sb2::Costume> for VM::Costume {
-    fn from(value: sb2::Costume) -> Self {
-        VM::Costume {
-            name: value.costume_name,
-            md5: value.base_layer_md5,
-            bitmap_resolution: value.bitmap_resolution,
-            rotation_center_x: value.rotation_center_x,
-            rotation_center_y: value.rotation_center_y,
-            layer_index: value.base_layer_id, // TODO: connect references
-        }
     }
 }

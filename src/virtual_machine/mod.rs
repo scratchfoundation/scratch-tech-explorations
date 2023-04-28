@@ -1,4 +1,7 @@
-use bevy::utils::HashMap;
+use bevy::{
+    prelude::*,
+    utils::HashMap,
+};
 
 mod from_sb2;
 pub mod load;
@@ -98,7 +101,7 @@ pub struct List {
 #[derive(Debug)]
 pub struct Sound {
     pub name: String,
-    pub md5: String,
+    pub audio_source: Handle<AudioSource>,
     pub format: String,
     pub sample_rate: i32,
     pub sample_count: i32,
@@ -109,7 +112,7 @@ pub struct Sound {
 #[derive(Debug)]
 pub struct Costume {
     pub name: String,
-    pub md5: String,
+    pub image: Handle<Image>,
     pub bitmap_resolution: i32,
     pub rotation_center_x: f64,
     pub rotation_center_y: f64,

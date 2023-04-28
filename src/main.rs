@@ -6,7 +6,10 @@ mod sprite;
 mod stage;
 mod virtual_machine;
 
-use assets::zip_asset_plugin::ZipAssetPlugin;
+use assets::{
+    json_asset_plugin::JSONAssetPlugin,
+    zip_asset_plugin::ZipAssetPlugin,
+};
 
 use bevy::{
     prelude::*,
@@ -38,6 +41,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugin(JSONAssetPlugin)
         .add_plugin(ZipAssetPlugin)
         .add_state::<AppState>()
         .add_plugin(ScratchLoadingScreenPlugin)
