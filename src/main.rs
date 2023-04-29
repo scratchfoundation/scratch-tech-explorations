@@ -7,8 +7,7 @@ mod stage;
 mod virtual_machine;
 
 use assets::{
-    json_asset_plugin::JSONAssetPlugin,
-    zip_asset_plugin::ZipAssetPlugin,
+    scratch_project_plugin::ScratchProjectPlugin,
 };
 
 use bevy::{
@@ -41,8 +40,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugin(JSONAssetPlugin)
-        .add_plugin(ZipAssetPlugin)
+        .add_plugin(ScratchProjectPlugin)
         .add_state::<AppState>()
         .add_plugin(ScratchLoadingScreenPlugin)
         .add_plugin(ScratchStagePlugin)

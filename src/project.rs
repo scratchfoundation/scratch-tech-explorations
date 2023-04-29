@@ -1,17 +1,8 @@
-use std::io;
-
 use bevy::asset::LoadState;
 use bevy::prelude::*;
 
-use bevy::prelude::system_adapter::new;
-use bevy::utils::HashSet;
-use zip::ZipArchive;
-
 use crate::AppState;
-use crate::assets::json_asset_plugin::JSONAsset;
-use crate::assets::zip_asset_plugin::ZipAsset;
-use crate::virtual_machine::VirtualMachine;
-use crate::virtual_machine::load::VMLoadError;
+use crate::assets::scratch_project_plugin::ScratchProject;
 
 pub struct ScratchDemoProjectPlugin;
 
@@ -24,15 +15,9 @@ impl Plugin for ScratchDemoProjectPlugin {
     }
 }
 
-enum LoadPhaseSB2 {
-    ProjectJSON(Handle<JSONAsset>),
-    Assets(VirtualMachine, HashSet<HandleUntyped>),
-}
-
 #[derive(Resource)]
-struct LoadingProjectSB2 {
-    phase: LoadPhaseSB2,
-    sb2_path: Option<String>,
+struct LoadingScratchProject {
+    project: Handle<ScratchProject>,
 }
 
 fn project_load(
@@ -41,48 +26,27 @@ fn project_load(
  ) {
     info!("Starting project load");
     let sb2_path = "Infinite ToeBeans.sb2";
-    let sb2_json = asset_server.load(sb2_path.to_string() + "#project.json");
-    commands.insert_resource(LoadingProjectSB2 {
-        phase: LoadPhaseSB2::ProjectJSON(sb2_json),
-        sb2_path: Some(sb2_path.to_string()),
+    let project = asset_server.load::<ScratchProject, _>(sb2_path);
+    commands.insert_resource(LoadingScratchProject {
+        project
     });
 }
 
 fn project_check_load(
-    mut commands: Commands,
-    mut loading_project: ResMut<LoadingProjectSB2>,
+    loading_project: Res<LoadingScratchProject>,
     asset_server: Res<AssetServer>,
-    assets_json: Res<Assets<JSONAsset>>,
     mut app_state: ResMut<NextState<AppState>>,
 ) {
-    match &mut loading_project.phase {
-        LoadPhaseSB2::ProjectJSON(ref sb2_json) => {
-            match asset_server.get_load_state(sb2_json) {
-                LoadState::Failed => {
-                    panic!("failed to load project");
-                }
-                LoadState::Loaded => {
-                    info!("loaded");
-                    if let Some(sb2_json) = assets_json.get(sb2_json) {
-                        let (vm, loading_assets) = VirtualMachine::from_sb2_json(&sb2_json.0, &loading_project.sb2_path, asset_server).unwrap();
-                        loading_project.phase = LoadPhaseSB2::Assets(vm, loading_assets);
-                    }
-                }
-                _ => {
-                    // not loaded / loading / unloaded: no need to do anything
-                }
-            }
+    match asset_server.get_load_state(&loading_project.project) {
+        LoadState::Failed => {
+            panic!("failed to load project");
         }
-        LoadPhaseSB2::Assets(vm, ref mut loading_assets) => {
-            info!("checking {} assets", loading_assets.len());
-            loading_assets
-                .drain_filter(|handle|
-                    asset_server.get_load_state(handle) == LoadState::Loaded
-                );
-            info!("remaining assets: {}", loading_assets.len());
-            if loading_assets.is_empty() {
-                app_state.set(AppState::Running);
-            }
-        },
+        LoadState::Loaded => {
+            info!("loaded");
+            app_state.set(AppState::Running);
+        }
+        _ => {
+            // not loaded / loading / unloaded: no need to do anything
+        }
     }
 }

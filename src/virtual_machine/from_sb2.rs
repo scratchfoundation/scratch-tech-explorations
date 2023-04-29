@@ -1,113 +1,209 @@
-use bevy::asset::Asset;
-use bevy::prelude::*;
-use bevy::utils::HashSet;
+use std::io::Cursor;
+use std::io::Read;
+use std::io::Seek;
 
+use bevy::asset::LoadedAsset;
+use bevy::prelude::*;
+use bevy::render::texture::CompressedImageFormats;
+use bevy::render::texture::ImageType;
+use bevy::utils::Entry;
+use bevy::utils::HashMap;
+use bevy::utils::HashSet;
+use zip::ZipArchive;
+
+use crate::assets::scratch_project_plugin::ScratchProject;
 use crate::sb2;
 
 use crate::virtual_machine as VM;
 
 use super::TopLevelItem;
-use super::load::{VMLoadError, VMLoadResult};
+use super::load::VMLoadError;
 
-impl VM::VirtualMachine {
-    pub fn from_sb2_json(
-        sb2_json: &[u8],
-        sb2_path: &Option<String>,
-        asset_server: Res<AssetServer>,
-    ) -> Result<(Self, HashSet<HandleUntyped>), VMLoadError> {
-        let project_description: sb2::Project = serde_json::from_slice(sb2_json)?;
+pub async fn load_sb2_zip_project<'a, 'b>(
+    bytes: &'a [u8],
+    load_context: &'a mut bevy::asset::LoadContext<'b>,
+) -> Result<(), bevy::asset::Error> {
+    info!("loading SB2 ZIP ({} bytes)", bytes.len());
+    let reader = Cursor::new(bytes.to_vec());
 
-        let mut asset_helper = AssetHelper {
-            asset_server,
-            sb2_path,
-            all_assets: HashSet::new()
-        };
+    let mut loading_assets = HashSet::new();
+    let mut loading_images = HashMap::new();
+    let mut loading_sounds = HashMap::new();
 
-        let stage = VM::Target::from_sb2_stage(project_description.stage, &mut asset_helper)?;
+    let mut asset_helper = AssetHelper {
+        load_context,
+        loading_assets: &mut loading_assets,
+        loading_images: &mut loading_images,
+        loading_sounds: &mut loading_sounds,
+        sb2_zip: ZipArchive::new(reader)?
+    };
 
-        let sprites_iter = project_description.children.into_iter()
-            .filter_map(|child| match child {
-                sb2::StageChild::Sprite(sprite) => Some(sprite),
-                _ => None
-            })
-            .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut asset_helper));
+    let sb2_json = asset_helper.sb2_zip.by_name("project.json")?;
+    let project: sb2::Project = serde_json::from_reader(sb2_json)?;
 
-        let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
+    let stage = VM::Target::from_sb2_stage(project.stage, &mut asset_helper)?;
 
-        Ok((VM::VirtualMachine {
+    let sprites_iter = project.children.into_iter()
+        .filter_map(|child| match child {
+            sb2::StageChild::Sprite(sprite) => Some(sprite),
+            _ => None
+        })
+        .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut asset_helper));
+
+    let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
+
+    load_context.set_default_asset(LoadedAsset::new(ScratchProject {
+        vm: VM::VirtualMachine {
             targets
-        }, asset_helper.all_assets))
-    }
+        },
+        loading_assets
+    }));
+
+    Ok(())
 }
 
-struct AssetHelper<'a> {
-    asset_server: Res<'a, AssetServer>,
-    sb2_path: &'a Option<String>,
-    all_assets: HashSet<HandleUntyped>,
+struct AssetHelper<'a, 'b, R> {
+    load_context: &'a mut bevy::asset::LoadContext<'b>,
+    loading_assets: &'a mut HashSet<HandleUntyped>,
+    loading_images: &'a mut HashMap<String, Handle<Image>>,
+    loading_sounds: &'a mut HashMap<String, Handle<AudioSource>>,
+    sb2_zip: ZipArchive<R>,
 }
 
-impl AssetHelper<'_> {
-    fn get_asset<T>(&mut self, md5: &str, ext: &str, id: i32) -> Handle<T>
+fn pretend_loading_is_slow() {
+    std::thread::sleep(std::time::Duration::from_millis(250));
+}
+
+impl<R> AssetHelper<'_, '_, R> {
+    fn get_image(&mut self, md5: &str, ext: &str, id: i32) -> Result<Handle<Image>, VMLoadError>
     where
-        T: Asset
+        R: Read + Seek
     {
-        let handle = match self.sb2_path {
-            Some(sb2_path) => {
-                self.asset_server.load(sb2_path.to_string() + "#" + &id.to_string() + "." + ext)
-            }
-            None => {
-                todo!("add support for downloading assets")
-            }
+        pretend_loading_is_slow();
+
+        let costume_file_name = id.to_string() + "." + ext;
+
+        let handle = match self.loading_images.entry(costume_file_name) {
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let image = match ext.to_lowercase().as_str() {
+                    "svg" => Image::default(), // TODO: SVG support
+                    _ => {
+                        let mut costume_file = self.sb2_zip.by_name(v.key())?;
+                        let mut costume_bytes = vec![];
+                        costume_file.read_to_end(&mut costume_bytes)?;
+                        Image::from_buffer(
+                            &costume_bytes,
+                            ImageType::Extension(ext),
+                            CompressedImageFormats::NONE,
+                            true
+                        )?
+                    }
+                };
+                let image_handle = self.load_context.set_labeled_asset(
+                    v.key(),
+                    LoadedAsset::new(image)
+                );
+                self.loading_assets.insert(image_handle.clone_untyped());
+                image_handle
+            },
         };
-        self.all_assets.insert(handle.clone_weak_untyped());
-        handle
+
+        Ok(handle)
+    }
+
+    fn get_sound(&mut self, md5: &str, ext: &str, id: i32) -> Result<Handle<AudioSource>, VMLoadError>
+    where
+        R: Read + Seek
+    {
+        pretend_loading_is_slow();
+
+        let sound_file_name = id.to_string() + "." + ext;
+
+        let handle = match self.loading_sounds.entry(sound_file_name) {
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let mut sound_file = self.sb2_zip.by_name(v.key())?;
+                let mut sound_bytes = vec![];
+                sound_file.read_to_end(&mut sound_bytes)?;
+                let sound = AudioSource {
+                    bytes: sound_bytes.into(),
+                };
+                let sound_handle = self.load_context.set_labeled_asset(
+                    v.key(),
+                    LoadedAsset::new(sound)
+                );
+                self.loading_assets.insert(sound_handle.clone_untyped());
+                sound_handle
+            },
+        };
+
+        Ok(handle)
     }
 }
 
-fn load_costumes(costumes: Vec<sb2::Costume>, asset_helper: &mut AssetHelper) -> Vec<VM::Costume> {
-    costumes
-        .into_iter()
-        .map(|costume| {
-            let image = match costume.base_layer_md5.split_once(".") {
-                Some((md5, ext)) => asset_helper.get_asset(md5, ext, costume.base_layer_id),
-                None => todo!("couldn't understand costume designation: {}", costume.base_layer_md5),
-            };
-            VM::Costume {
-                name: costume.costume_name,
-                image,
-                bitmap_resolution: costume.bitmap_resolution,
-                rotation_center_x: costume.rotation_center_x,
-                rotation_center_y: costume.rotation_center_y,
-                layer_index: costume.base_layer_id,
-            }
-        })
-        .collect()
+fn load_costumes<R>(
+    costumes: Vec<sb2::Costume>,
+    asset_helper: &mut AssetHelper<'_, '_, R>,
+) -> Result<Vec<VM::Costume>, VMLoadError>
+where
+    R: Read + Seek
+{
+    let mut loaded_costumes = vec![];
+    for costume in costumes {
+        let image = match costume.base_layer_md5.split_once('.') {
+            Some((md5, ext)) => {
+                asset_helper.get_image(md5, ext, costume.base_layer_id)?
+            },
+            None => todo!("couldn't understand costume designation: {}", costume.base_layer_md5),
+        };
+        loaded_costumes.push(VM::Costume {
+            name: costume.costume_name,
+            image,
+            bitmap_resolution: costume.bitmap_resolution,
+            rotation_center_x: costume.rotation_center_x,
+            rotation_center_y: costume.rotation_center_y,
+            layer_index: costume.base_layer_id,
+        });
+    }
+    Ok(loaded_costumes)
 }
 
-fn load_sounds(sounds: Vec<sb2::Sound>, asset_helper: &mut AssetHelper) -> Vec<VM::Sound> {
-    sounds
-        .into_iter()
-        .map(|sound| {
-            let audio_source = match sound.md5.split_once(".") {
-                Some((md5, ext)) => asset_helper.get_asset(md5, ext, sound.sound_id),
-                None => todo!("couldn't understand sound designation: {}", sound.md5),
-            };
-            VM::Sound {
-                name: sound.sound_name,
-                audio_source,
-                format: sound.format,
-                sample_rate: sound.rate,
-                sample_count: sound.sample_count,
-                sound_index: sound.sound_id,
-            }
+fn load_sounds<R>(
+    sounds: Vec<sb2::Sound>,
+    asset_helper: &mut AssetHelper<'_, '_, R>,
+) -> Result<Vec<VM::Sound>, VMLoadError>
+where
+    R: Read + Seek
+{
+    let mut loaded_sounds = vec![];
+    for sound in sounds {
+        let audio_source = match sound.md5.split_once('.') {
+            Some((md5, ext)) => asset_helper.get_sound(md5, ext, sound.sound_id)?,
+            None => todo!("couldn't understand sound designation: {}", sound.md5),
+        };
+        loaded_sounds.push(VM::Sound {
+            name: sound.sound_name,
+            audio_source,
+            format: sound.format,
+            sample_rate: sound.rate,
+            sample_count: sound.sample_count,
+            sound_index: sound.sound_id,
         })
-        .collect()
+    }
+    Ok(loaded_sounds)
 }
 
 impl VM::Target {
-    fn from_sb2_stage(stage: sb2::Stage, asset_helper: &mut AssetHelper) -> Result<VM::Target, VMLoadError> {
-        let costumes = load_costumes(stage.target.costumes, asset_helper);
-        let sounds = load_sounds(stage.target.sounds, asset_helper);
+    fn from_sb2_stage<R>(
+        stage: sb2::Stage,
+        asset_helper: &mut AssetHelper<'_, '_, R>
+    ) -> Result<VM::Target, VMLoadError>
+    where
+        R: Read + Seek
+    {
+        let costumes = load_costumes(stage.target.costumes, asset_helper)?;
+        let sounds = load_sounds(stage.target.sounds, asset_helper)?;
 
         Ok(VM::Target {
             name: stage.target.name,
@@ -127,9 +223,15 @@ impl VM::Target {
         })
     }
 
-    fn from_sb2_sprite(sprite: sb2::Sprite, asset_helper: &mut AssetHelper) -> Result<VM::Target, VMLoadError> {
-        let costumes = load_costumes(sprite.target.costumes, asset_helper);
-        let sounds = load_sounds(sprite.target.sounds, asset_helper);
+    fn from_sb2_sprite<R>(
+        sprite: sb2::Sprite,
+        asset_helper: &mut AssetHelper<'_, '_, R>
+    ) -> Result<VM::Target, VMLoadError>
+    where
+        R: Read + Seek
+    {
+        let costumes = load_costumes(sprite.target.costumes, asset_helper)?;
+        let sounds = load_sounds(sprite.target.sounds, asset_helper)?;
 
         Ok(VM::Target {
             name: sprite.target.name,

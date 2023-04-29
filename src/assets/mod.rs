@@ -1,2 +1,1 @@
-pub mod json_asset_plugin;
-pub mod zip_asset_plugin;
+pub(crate) mod scratch_project_plugin;

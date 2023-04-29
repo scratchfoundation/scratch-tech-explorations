@@ -3,7 +3,7 @@ use bevy::{
     utils::HashMap,
 };
 
-mod from_sb2;
+pub mod from_sb2;
 pub mod load;
 
 // This represents the virtual machine state for a Scratch project.

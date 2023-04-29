@@ -1,15 +1,15 @@
+use bevy::render::texture::TextureError;
 use zip::result::ZipError;
-
-use super::VirtualMachine;
-
-pub type VMLoadResult = Result<VirtualMachine, VMLoadError>;
 
 #[derive(Debug)]
 pub enum VMLoadError {
     Io(std::io::Error),
     Parse(serde_json::Error),
+    Texture(TextureError),
     Zip(ZipError),
 }
+
+impl std::error::Error for VMLoadError {}
 
 impl From<std::io::Error> for VMLoadError {
     fn from(err: std::io::Error) -> Self {
@@ -20,6 +20,12 @@ impl From<std::io::Error> for VMLoadError {
 impl From<serde_json::Error> for VMLoadError {
     fn from(err: serde_json::Error) -> Self {
         Self::Parse(err)
+    }
+}
+
+impl From<TextureError> for VMLoadError {
+    fn from(err: TextureError) -> Self {
+        Self::Texture(err)
     }
 }
 
@@ -34,6 +40,7 @@ impl std::fmt::Display for VMLoadError {
         match self {
             Self::Io(err) => write!(f, "{}", err),
             Self::Parse(err) => write!(f, "{}", err),
+            Self::Texture(err) => write!(f, "{}", err),
             Self::Zip(err) => write!(f, "{}", err),
         }
     }
