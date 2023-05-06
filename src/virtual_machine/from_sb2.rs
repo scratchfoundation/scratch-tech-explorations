@@ -86,8 +86,12 @@ impl<R> AssetHelper<'_, '_, R> {
         let handle = match self.loading_images.entry(costume_file_name) {
             Entry::Occupied(o) => o.get().clone(),
             Entry::Vacant(v) => {
+                let mut is_fake = false;
                 let image = match ext.to_lowercase().as_str() {
-                    "svg" => Image::default(), // TODO: SVG support
+                    "svg" => {
+                        is_fake = true;
+                        Image::default() // TODO: SVG support
+                    }
                     _ => {
                         let mut costume_file = self.sb2_zip.by_name(v.key())?;
                         let mut costume_bytes = vec![];
@@ -104,6 +108,7 @@ impl<R> AssetHelper<'_, '_, R> {
                     v.key(),
                     LoadedAsset::new(image)
                 );
+                if is_fake { warn!("used fake image for {:?}", image_handle); }
                 self.loading_assets.insert(image_handle.clone_untyped());
                 image_handle
             },
@@ -237,7 +242,7 @@ impl VM::Target {
             name: sprite.target.name,
             x: sprite.x,
             y: sprite.y,
-            scale: sprite.scale,
+            scale: sprite.scale * 100.0,
             direction: sprite.direction,
             rotation_style: sprite.rotation_style.into(),
             is_draggable: sprite.is_draggable,

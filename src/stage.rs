@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, render::camera::ScalingMode};
 
 use crate::sprite::{ScratchCode, ScratchScripts};
 
@@ -24,7 +24,16 @@ impl Plugin for ScratchStagePlugin {
 }
 
 fn add_stage_startup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle {
+        projection: OrthographicProjection {
+            scaling_mode: ScalingMode::AutoMin {
+                min_width: 480.0,
+                min_height: 360.0,
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 }
 
 fn step_thread(mut thread_query: Query<(&mut Transform, &ScratchScripts)>) {

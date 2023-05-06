@@ -11,7 +11,9 @@ impl Plugin for ScratchDemoProjectPlugin {
         app
             .add_startup_system(project_load)
             .add_system(project_check_load
-                .in_set(OnUpdate(AppState::Loading)));
+                .in_set(OnUpdate(AppState::Loading)))
+            .add_system(spawn_project
+                .in_schedule(OnEnter(AppState::Running)));
     }
 }
 
@@ -49,4 +51,15 @@ fn project_check_load(
             // not loaded / loading / unloaded: no need to do anything
         }
     }
+}
+
+fn spawn_project(
+    mut commands: Commands,
+    loading_project: Res<LoadingScratchProject>,
+    project_assets: Res<Assets<ScratchProject>>,
+) {
+    let project = project_assets.get(&loading_project.project)
+        .expect("Tried to spawn a project that doesn't exist!");
+    commands.remove_resource::<LoadingScratchProject>();
+    project.vm.spawn(commands);
 }

@@ -5,6 +5,7 @@ use bevy::{
 
 pub mod from_sb2;
 pub mod load;
+pub mod spawn;
 
 // This represents the virtual machine state for a Scratch project.
 // Ideally, loading a new Scratch project should mean throwing this away and replacing it with a new instance.
@@ -19,7 +20,7 @@ pub struct Target {
 
     pub x: f64,
     pub y: f64,
-    pub scale: f64,
+    pub scale: f64, // percentage: 100=100%
     pub direction: f64,
     pub rotation_style: RotationStyle,
     pub is_draggable: bool,
@@ -31,7 +32,7 @@ pub struct Target {
     pub sounds: Vec<Sound>,
     pub costumes: Vec<Costume>,
 
-    pub current_costume: i32,
+    pub current_costume: usize,
 }
 
 #[derive(Debug, Default)]

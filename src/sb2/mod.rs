@@ -67,7 +67,7 @@ pub struct Sprite {
     #[serde(rename="scratchY")]
     pub y: f64,
 
-    pub scale: f64,
+    pub scale: f64, // scaling factor: 1.0=100%
     pub direction: f64,
 
     pub rotation_style: RotationStyle,
@@ -104,7 +104,7 @@ pub struct Target {
     #[serde(default)]
     pub costumes: Vec<Costume>,
 
-    pub current_costume_index: i32,
+    pub current_costume_index: usize,
 
     #[serde(default)]
     pub scripts: Vec<TopLevelScript>,
