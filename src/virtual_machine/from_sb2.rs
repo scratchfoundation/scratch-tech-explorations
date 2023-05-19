@@ -41,20 +41,20 @@ pub async fn load_sb2_zip_project<'a, 'b>(
     let sb2_json = asset_helper.sb2_zip.by_name("project.json")?;
     let project: sb2::Project = serde_json::from_reader(sb2_json)?;
 
-    let stage = VM::Target::from_sb2_stage(project.stage, &mut asset_helper)?;
+    let stage = VM::Sprite::from_sb2_stage(project.stage, &mut asset_helper)?;
 
     let sprites_iter = project.children.into_iter()
         .filter_map(|child| match child {
             sb2::StageChild::Sprite(sprite) => Some(sprite),
             _ => None
         })
-        .map(|sprite| VM::Target::from_sb2_sprite(sprite, &mut asset_helper));
+        .map(|sprite| VM::Sprite::from_sb2_sprite(sprite, &mut asset_helper));
 
-    let targets = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
+    let sprites = Some(Ok(stage)).into_iter().chain(sprites_iter).collect::<Result<_,_>>()?;
 
     load_context.set_default_asset(LoadedAsset::new(ScratchProject {
         vm: VM::VirtualMachine {
-            targets
+            sprites
         },
         loading_assets
     }));
@@ -199,60 +199,68 @@ where
     Ok(loaded_sounds)
 }
 
-impl VM::Target {
+impl VM::Sprite {
     fn from_sb2_stage<R>(
         stage: sb2::Stage,
         asset_helper: &mut AssetHelper<'_, '_, R>
-    ) -> Result<VM::Target, VMLoadError>
+    ) -> Result<VM::Sprite, VMLoadError>
     where
         R: Read + Seek
     {
         let costumes = load_costumes(stage.target.costumes, asset_helper)?;
         let sounds = load_sounds(stage.target.sounds, asset_helper)?;
 
-        Ok(VM::Target {
+        Ok(VM::Sprite {
             name: stage.target.name,
-            x: 0.0,
-            y: 0.0,
-            scale: 100.0,
-            direction: 90.0,
-            rotation_style: VM::RotationStyle::None,
-            is_draggable: false,
-            is_visible: true,
             scripts: stage.target.scripts.into_iter().map(|script| script.into()).collect(),
-            variables: stage.target.variables.into_iter().map(|script| script.into()).collect(),
-            lists: stage.target.lists.into_iter().map(|script| script.into()).collect(),
             sounds,
             costumes,
-            current_costume: stage.target.current_costume_index,
+            targets: vec![
+                VM::Target {
+                    x: 0.0,
+                    y: 0.0,
+                    scale: 100.0,
+                    direction: 90.0,
+                    rotation_style: VM::RotationStyle::None,
+                    is_draggable: false,
+                    is_visible: true,
+                    variables: stage.target.variables.into_iter().map(|script| script.into()).collect(),
+                    lists: stage.target.lists.into_iter().map(|script| script.into()).collect(),
+                    current_costume: stage.target.current_costume_index,
+                }
+            ],
         })
     }
 
     fn from_sb2_sprite<R>(
         sprite: sb2::Sprite,
         asset_helper: &mut AssetHelper<'_, '_, R>
-    ) -> Result<VM::Target, VMLoadError>
+    ) -> Result<VM::Sprite, VMLoadError>
     where
         R: Read + Seek
     {
         let costumes = load_costumes(sprite.target.costumes, asset_helper)?;
         let sounds = load_sounds(sprite.target.sounds, asset_helper)?;
 
-        Ok(VM::Target {
+        Ok(VM::Sprite {
             name: sprite.target.name,
-            x: sprite.x,
-            y: sprite.y,
-            scale: sprite.scale * 100.0,
-            direction: sprite.direction,
-            rotation_style: sprite.rotation_style.into(),
-            is_draggable: sprite.is_draggable,
-            is_visible: sprite.is_visible,
             scripts: sprite.target.scripts.into_iter().map(|script| script.into()).collect(),
-            variables: sprite.target.variables.into_iter().map(|script| script.into()).collect(),
-            lists: sprite.target.lists.into_iter().map(|script| script.into()).collect(),
             sounds,
             costumes,
-            current_costume: sprite.target.current_costume_index,
+            targets: vec![
+                VM::Target {
+                    x: sprite.x,
+                    y: sprite.y,
+                    scale: sprite.scale * 100.0,
+                    direction: sprite.direction,
+                    rotation_style: sprite.rotation_style.into(),
+                    is_draggable: sprite.is_draggable,
+                    is_visible: sprite.is_visible,
+                    variables: sprite.target.variables.into_iter().map(|script| script.into()).collect(),
+                    lists: sprite.target.lists.into_iter().map(|script| script.into()).collect(),
+                    current_costume: sprite.target.current_costume_index,
+                }
+            ]
         })
     }
 }
