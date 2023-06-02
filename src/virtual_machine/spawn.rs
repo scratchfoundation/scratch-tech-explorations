@@ -31,22 +31,46 @@ impl VM::VirtualMachine {
             };
             let sprite_handle = sprite_server.add(sprite);
             sprites.push(sprite_handle.clone());
+            let sprite = sprite_server.get_mut(&sprite_handle).unwrap();
 
-            let target = commands.spawn(
-                VM::Target {
-                    x: archetype.x,
-                    y: archetype.y,
-                    scale: archetype.scale,
-                    direction: archetype.direction,
-                    rotation_style: archetype.rotation_style,
-                    is_draggable: archetype.is_draggable,
-                    is_visible: archetype.is_visible,
-                    variables: archetype.variables,
-                    lists: archetype.lists,
-                    current_costume: archetype.current_costume,
-                    sprite: sprite_handle,
-                }
-            ).id();
+            let costume = &sprite.costumes[archetype.current_costume];
+            let scale = (archetype.scale / (costume.bitmap_resolution as f64) / 100.0) as f32;
+
+            let target = commands
+                .spawn((
+                    VM::Target {
+                        x: archetype.x,
+                        y: archetype.y,
+                        scale: archetype.scale,
+                        direction: archetype.direction,
+                        rotation_style: archetype.rotation_style,
+                        is_draggable: archetype.is_draggable,
+                        is_visible: archetype.is_visible,
+                        variables: archetype.variables,
+                        lists: archetype.lists,
+                        current_costume: archetype.current_costume,
+                        sprite: sprite_handle,
+                    },
+                    SpriteBundle {
+                        transform: Transform {
+                            translation: Vec3::new(
+                                archetype.x as f32,
+                                archetype.y as f32,
+                                sprites.len() as f32, // TODO: z-order
+                            ),
+                            rotation: quat_from_direction(archetype.direction),
+                            scale: Vec3::new(
+                                scale,
+                                scale,
+                                1.0
+                            )
+                        },
+                        texture: (sprite.costumes[archetype.current_costume].image).clone(),
+                        visibility: if archetype.is_visible { Visibility::Visible } else { Visibility::Hidden },
+                        ..Default::default()
+                    }
+                ))
+                .id();
 
             // TODO: track target entity?
 
