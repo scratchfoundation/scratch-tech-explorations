@@ -1,24 +1,25 @@
+//! This module contains code for loading a Scratch 2.0 project, either from an SB2 file or from JSON.
+//! The result is a `Project` struct containing the project structure and all related assets.
+//! This is "frozen" data and must be loaded into a VM before it can run.
+
 use std::fmt::Debug;
+use std::io::{Cursor, Read, Seek};
 
+use bevy::asset::Error as AnyError; // anyhow::Error
+use bevy::asset::LoadedAsset;
+use bevy::prelude::*;
+use bevy::reflect::TypeUuid;
+use bevy::render::texture::{ImageType, CompressedImageFormats};
+use bevy::utils::{Entry, HashMap, HashSet};
 use serde::{Deserialize, Serialize, de::{Visitor, self}, ser::SerializeSeq};
+use zip::ZipArchive;
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-#[derive(Deserialize, Serialize)]
-#[repr(transparent)]
-pub struct BlockId(String);
-
-#[derive(Debug, Eq, Hash, PartialEq)]
-#[derive(Deserialize, Serialize)]
-#[repr(transparent)]
-pub struct ListId(String);
-
-#[derive(Debug, Eq, Hash, PartialEq)]
-#[derive(Deserialize, Serialize)]
-#[repr(transparent)]
-pub struct VariableId(String);
+use crate::assets::scratch_project_plugin::ScratchProject;
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize)]
+#[derive(TypeUuid)]
+#[uuid = "7e6fc139-66f6-4916-a118-5ae4b90e7bae"]
 pub struct Project {
     #[serde(flatten)]
     pub stage: Stage,
@@ -173,6 +174,9 @@ pub struct Costume {
 
     pub rotation_center_x: f64,
     pub rotation_center_y: f64,
+
+    #[serde(skip)]
+    pub image: Handle<Image>,
 }
 
 #[derive(Debug)]
@@ -188,6 +192,9 @@ pub struct Sound {
     pub sample_count: i32,
     pub rate: i32,
     pub format: String,
+
+    #[serde(skip)]
+    pub audio_source: Handle<AudioSource>,
 }
 
 #[derive(Debug)]
@@ -454,4 +461,171 @@ impl Serialize for BasicBlock {
         }
         state.end()
     }
+}
+
+pub fn load_project_from_zip<'a>(
+    bytes: &'a [u8],
+    load_context: &'a mut bevy::asset::LoadContext<'_>,
+) -> Result<(), bevy::asset::Error> {
+    info!("loading SB2 ZIP ({} bytes)", bytes.len());
+    let reader = Cursor::new(bytes.to_vec());
+
+    let mut loading_assets = HashSet::new();
+    let mut loading_images = HashMap::new();
+    let mut loading_sounds = HashMap::new();
+
+    let mut asset_helper = AssetHelper {
+        load_context,
+        loading_assets: &mut loading_assets,
+        loading_images: &mut loading_images,
+        loading_sounds: &mut loading_sounds,
+        sb2_zip: ZipArchive::new(reader)?
+    };
+
+    let sb2_json = asset_helper.sb2_zip.by_name("project.json")?;
+    let mut project: Project = serde_json::from_reader(sb2_json)?;
+
+    load_costumes(&mut project.stage.target.costumes, &mut asset_helper)?;
+    load_sounds(&mut project.stage.target.sounds, &mut asset_helper)?;
+
+    for stage_child in &mut project.children {
+        match stage_child {
+            StageChild::Sprite(sprite) => {
+                load_costumes(&mut sprite.target.costumes, &mut asset_helper)?;
+                load_sounds(&mut sprite.target.sounds, &mut asset_helper)?;
+            }
+            _ => {}
+        }
+    }
+
+    load_context.set_default_asset(LoadedAsset::new(
+        ScratchProject::SB2(project)
+    ));
+
+    Ok(())
+}
+
+struct AssetHelper<'a, 'b, R> {
+    load_context: &'a mut bevy::asset::LoadContext<'b>,
+    loading_assets: &'a mut HashSet<HandleUntyped>,
+    loading_images: &'a mut HashMap<String, Handle<Image>>,
+    loading_sounds: &'a mut HashMap<String, Handle<AudioSource>>,
+    sb2_zip: ZipArchive<R>,
+}
+
+fn pretend_loading_is_slow() {
+    std::thread::sleep(std::time::Duration::from_millis(250));
+}
+
+impl<R> AssetHelper<'_, '_, R> {
+    fn get_image(&mut self, md5: &str, ext: &str, id: i32) -> Result<Handle<Image>, AnyError>
+    where
+        R: Read + Seek
+    {
+        pretend_loading_is_slow();
+
+        let costume_file_name = id.to_string() + "." + ext;
+
+        let handle = match self.loading_images.entry(costume_file_name) {
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let mut is_fake = false;
+                let image = match ext.to_lowercase().as_str() {
+                    "svg" => {
+                        is_fake = true;
+                        Image::default() // TODO: SVG support
+                    }
+                    _ => {
+                        let mut costume_file = self.sb2_zip.by_name(v.key())?;
+                        let mut costume_bytes = vec![];
+                        costume_file.read_to_end(&mut costume_bytes)?;
+                        Image::from_buffer(
+                            &costume_bytes,
+                            ImageType::Extension(ext),
+                            CompressedImageFormats::NONE,
+                            true
+                        )?
+                    }
+                };
+                let image_handle = self.load_context.set_labeled_asset(
+                    v.key(),
+                    LoadedAsset::new(image)
+                );
+                if is_fake { warn!("used fake image for {:?}", image_handle); }
+                self.loading_assets.insert(image_handle.clone_untyped());
+                image_handle
+            },
+        };
+
+        Ok(handle)
+    }
+
+    fn get_sound(&mut self, md5: &str, ext: &str, id: i32) -> std::io::Result<Handle<AudioSource>>
+    where
+        R: Read + Seek
+    {
+        pretend_loading_is_slow();
+
+        let sound_file_name = id.to_string() + "." + ext;
+
+        let handle = match self.loading_sounds.entry(sound_file_name) {
+            Entry::Occupied(o) => o.get().clone(),
+            Entry::Vacant(v) => {
+                let mut sound_file = self.sb2_zip.by_name(v.key())?;
+                let mut sound_bytes = vec![];
+                sound_file.read_to_end(&mut sound_bytes)?;
+                let sound = AudioSource {
+                    bytes: sound_bytes.into(),
+                };
+                let sound_handle = self.load_context.set_labeled_asset(
+                    v.key(),
+                    LoadedAsset::new(sound)
+                );
+                self.loading_assets.insert(sound_handle.clone_untyped());
+                sound_handle
+            },
+        };
+
+        Ok(handle)
+    }
+}
+
+fn load_costumes<R>(
+    costumes: &mut Vec<Costume>,
+    asset_helper: &mut AssetHelper<'_, '_, R>,
+) -> Result<Vec<Handle<Image>>, AnyError>
+where
+    R: Read + Seek
+{
+    let mut loaded_costumes = vec![];
+    for costume in costumes {
+        costume.image = match costume.base_layer_md5.split_once('.') {
+            Some((md5, ext)) => {
+                asset_helper.get_image(md5, ext, costume.base_layer_id)?
+            },
+            None => todo!("couldn't understand costume designation: {}", costume.base_layer_md5),
+        };
+        loaded_costumes.push(costume.image.clone());
+    }
+    Ok(loaded_costumes)
+}
+
+fn load_sounds<R>(
+    sounds: &mut Vec<Sound>,
+    asset_helper: &mut AssetHelper<'_, '_, R>,
+) -> Result<Vec<Handle<AudioSource>>, AnyError>
+where
+    R: Read + Seek
+{
+    let mut loaded_sounds = vec![];
+    for sound in sounds {
+        sound.audio_source = match sound.md5.split_once('.') {
+            Some((md5, ext)) => {
+                asset_helper.get_sound(md5, ext, sound.sound_id)?
+            },
+            None => todo!("couldn't understand sound designation: {}", sound.md5),
+        };
+        loaded_sounds.push(sound.audio_source.clone());
+    }
+    Ok(loaded_sounds)
 }

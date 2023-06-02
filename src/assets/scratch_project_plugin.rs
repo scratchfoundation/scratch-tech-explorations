@@ -5,16 +5,13 @@ use bevy::{
     utils::HashSet,
 };
 
-use crate::{
-    virtual_machine::{VirtualMachine, from_sb2::load_sb2_zip_project}
-};
+use crate::sb2::{self, load_project_from_zip};
 
 #[derive(Debug)]
 #[derive(TypeUuid)]
 #[uuid = "7e6fc139-66f6-4916-a118-5ae4b90e7bae"]
-pub struct ScratchProject {
-    pub vm: VirtualMachine,
-    pub loading_assets: HashSet<HandleUntyped>,
+pub enum ScratchProject {
+    SB2(sb2::Project),
 }
 
 pub struct ScratchProjectPlugin;
@@ -54,5 +51,5 @@ async fn load_scratch_project<'a, 'b>(
     // TODO: determine what kind of file this is and load it appropriately
     // Supporting everything means: SB binary, SB2 ZIP, SB3 ZIP, SB2 JSON, SB3 JSON
     // For now, assume it's a zipped SB2
-    load_sb2_zip_project(bytes, load_context).await
+    load_project_from_zip(bytes, load_context)
 }

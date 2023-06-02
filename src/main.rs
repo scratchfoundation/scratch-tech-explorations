@@ -2,6 +2,7 @@ mod assets;
 mod loading_screen;
 mod project;
 mod sb2;
+mod sb4;
 mod sprite;
 mod stage;
 mod virtual_machine;
