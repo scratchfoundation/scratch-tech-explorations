@@ -4,8 +4,12 @@ use bevy::{prelude::*, render::camera::ScalingMode, time::common_conditions::on_
 
 use crate::{virtual_machine as VM, AppState};
 
-const TIME_STEP: f32 = 1. / 30.;
-const WORK_TIME: f32 = 0.75 * TIME_STEP;
+/// The time between each frame of the VM, when running at full speed.
+const TIME_STEP: Duration = Duration::new(0, (Duration::from_secs(1).as_nanos() / 30) as u32);
+
+/// When the work time expires, the VM will stop running code until next tick.
+/// This is 3/4 of TIME_STEP
+const WORK_TIME: Duration = Duration::new(0, (Duration::from_secs(1).as_nanos() / 40) as u32);
 
 pub struct RuntimePlugin;
 
@@ -18,7 +22,7 @@ impl Plugin for RuntimePlugin {
 
         app.insert_resource(WorkTimer(Instant::now()));
 
-        app.configure_set(OnUpdate(AppState::Running).run_if(on_timer(Duration::from_secs_f32(TIME_STEP))));
+        app.configure_set(OnUpdate(AppState::Running).run_if(on_timer(TIME_STEP)));
         app.add_systems((
             reset_work_timer,
             start_hats,
@@ -61,7 +65,7 @@ fn step_threads(
         for (mut transform, _target) in &mut thread_query {
             transform.rotate_z(one_degree_in_radians);
         }
-        if work_timer.0.elapsed().as_secs_f32() > WORK_TIME {
+        if work_timer.0.elapsed() >= WORK_TIME {
             break;
         }
     }
