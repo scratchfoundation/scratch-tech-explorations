@@ -25,11 +25,13 @@ use bevy::{
 use crate::sb4;
 
 pub mod load;
+pub mod runtime;
 pub mod spawn;
 
 // This represents the virtual machine state for a Scratch project.
 // Ideally, loading a new Scratch project should mean throwing this away and replacing it with a new instance.
 #[derive(Debug)]
+#[derive(Resource)]
 pub struct VirtualMachine {
     pub sprites: Vec<Handle<Sprite>>,
 }

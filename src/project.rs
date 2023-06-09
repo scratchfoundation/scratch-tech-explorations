@@ -56,7 +56,7 @@ fn project_check_load(
 }
 
 fn spawn_project(
-    commands: Commands,
+    mut commands: Commands,
     loading_project: Res<LoadingScratchProject>,
     mut project_assets: ResMut<Assets<ScratchProject>>,
     sprites: ResMut<Assets<VM::Sprite>>,
@@ -66,5 +66,6 @@ fn spawn_project(
     let sb4 = match project {
         ScratchProject::SB2(sb2) => sb2.into(),
     };
-    VirtualMachine::spawn_from(sb4, commands, sprites);
+    let vm = VirtualMachine::spawn_from(sb4, &mut commands, sprites);
+    commands.insert_resource(vm);
 }

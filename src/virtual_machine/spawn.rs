@@ -15,7 +15,7 @@ impl VM::VirtualMachine {
     /// This probably only makes sense at the end of project load.
     pub fn spawn_from(
         sb4_project: sb4::Project,
-        mut commands: Commands,
+        commands: &mut Commands,
         mut sprite_server: ResMut<Assets<VM::Sprite>>,
     ) -> VM::VirtualMachine {
         let mut sprites = Vec::new();

@@ -3,8 +3,6 @@ mod loading_screen;
 mod project;
 mod sb2;
 mod sb4;
-mod sprite;
-mod stage;
 mod virtual_machine;
 
 use assets::{
@@ -18,7 +16,7 @@ use bevy::{
 
 use loading_screen::ScratchLoadingScreenPlugin;
 use project::ScratchDemoProjectPlugin;
-use stage::ScratchStagePlugin;
+use virtual_machine::runtime::RuntimePlugin;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, Default)]
 
@@ -44,7 +42,7 @@ fn main() {
         .add_plugin(ScratchProjectPlugin)
         .add_state::<AppState>()
         .add_plugin(ScratchLoadingScreenPlugin)
-        .add_plugin(ScratchStagePlugin)
+        .add_plugin(RuntimePlugin)
         .add_plugin(ScratchDemoProjectPlugin)
         .add_system(close_on_esc)
         .run();
