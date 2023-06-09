@@ -2,7 +2,6 @@ use bevy::{
     asset::AssetLoader,
     prelude::*,
     reflect::TypeUuid,
-    utils::HashSet,
 };
 
 use crate::sb2::{self, load_project_from_zip};

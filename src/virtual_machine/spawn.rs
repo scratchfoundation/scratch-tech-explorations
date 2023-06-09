@@ -36,7 +36,7 @@ impl VM::VirtualMachine {
             let costume = &sprite.costumes[archetype.current_costume];
             let scale = (archetype.scale / (costume.bitmap_resolution as f64) / 100.0) as f32;
 
-            let target = commands
+            let _target = commands
                 .spawn((
                     VM::Target {
                         x: archetype.x,

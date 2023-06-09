@@ -489,12 +489,9 @@ pub fn load_project_from_zip<'a>(
     load_sounds(&mut project.stage.target.sounds, &mut asset_helper)?;
 
     for stage_child in &mut project.children {
-        match stage_child {
-            StageChild::Sprite(sprite) => {
-                load_costumes(&mut sprite.target.costumes, &mut asset_helper)?;
-                load_sounds(&mut sprite.target.sounds, &mut asset_helper)?;
-            }
-            _ => {}
+        if let StageChild::Sprite(sprite) = stage_child {
+            load_costumes(&mut sprite.target.costumes, &mut asset_helper)?;
+            load_sounds(&mut sprite.target.sounds, &mut asset_helper)?;
         }
     }
 
@@ -518,7 +515,7 @@ fn pretend_loading_is_slow() {
 }
 
 impl<R> AssetHelper<'_, '_, R> {
-    fn get_image(&mut self, md5: &str, ext: &str, id: i32) -> Result<Handle<Image>, AnyError>
+    fn get_image(&mut self, _md5: &str, ext: &str, id: i32) -> Result<Handle<Image>, AnyError>
     where
         R: Read + Seek
     {
@@ -560,7 +557,7 @@ impl<R> AssetHelper<'_, '_, R> {
         Ok(handle)
     }
 
-    fn get_sound(&mut self, md5: &str, ext: &str, id: i32) -> std::io::Result<Handle<AudioSource>>
+    fn get_sound(&mut self, _md5: &str, ext: &str, id: i32) -> std::io::Result<Handle<AudioSource>>
     where
         R: Read + Seek
     {

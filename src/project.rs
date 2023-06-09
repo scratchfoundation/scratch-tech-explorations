@@ -3,7 +3,6 @@ use bevy::prelude::*;
 
 use crate::AppState;
 use crate::assets::scratch_project_plugin::ScratchProject;
-use crate::sb2;
 use crate::virtual_machine::{self as VM, VirtualMachine};
 
 pub struct ScratchDemoProjectPlugin;
@@ -57,15 +56,15 @@ fn project_check_load(
 }
 
 fn spawn_project(
-    mut commands: Commands,
+    commands: Commands,
     loading_project: Res<LoadingScratchProject>,
     mut project_assets: ResMut<Assets<ScratchProject>>,
-    mut sprites: ResMut<Assets<VM::Sprite>>,
+    sprites: ResMut<Assets<VM::Sprite>>,
 ) {
     let project = project_assets.remove(&loading_project.project)
         .expect("Tried to spawn a project that doesn't exist!");
     let sb4 = match project {
         ScratchProject::SB2(sb2) => sb2.into(),
     };
-    let vm = VirtualMachine::spawn_from(sb4, commands, sprites);
+    VirtualMachine::spawn_from(sb4, commands, sprites);
 }
